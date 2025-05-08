@@ -1,6 +1,6 @@
 ---
-name: Feature request
-about: Suggest an idea for this project
+name: Task
+about: Track the tasks of the project
 title: ''
 labels: ''
 assignees: ''
