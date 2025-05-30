@@ -2,7 +2,7 @@
 name: Task
 about: Track the tasks of the project
 title: ''
-labels: ''
+labels: task
 assignees: ''
 
 ---
