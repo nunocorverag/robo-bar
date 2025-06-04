@@ -19,7 +19,7 @@
  ******************************************************************************/
 
 /* UART instance and configuration */
-#define DEBUG_UART                  UART0
+#define DEBUG_UART                  ((UART_Type *)UART0_BASE)
 #define DEBUG_UART_CLKSRC           UART0_CLK_SRC
 #define DEBUG_UART_CLK_FREQ         CLOCK_GetFreq(UART0_CLK_SRC)
 #define DEBUG_UART_IRQ              UART0_IRQn
@@ -36,7 +36,6 @@
 #define DEBUG_UART_TX_PIN           2U
 #define DEBUG_UART_TX_PIN_MUX       kPORT_MuxAlt2
 
-/* UART configuration parameters */
 #define DEBUG_UART_BAUDRATE         115200U
 #define DEBUG_UART_DATA_BITS        kUART_EightDataBits
 #define DEBUG_UART_PARITY           kUART_ParityDisabled
@@ -66,18 +65,17 @@ typedef enum {
     UART_STATUS_BUFFER_FULL
 } uart_status_t;
 
-/* UART configuration structure */
+/* UART configuration structure - CORREGIDO */
 typedef struct {
     UART_Type *base;
     uint32_t baudrate;
-    uart_data_bits_t data_bits;
+    uint8_t data_bits;   
     uart_parity_mode_t parity;
     uart_stop_bit_count_t stop_bits;
     bool enable_tx;
     bool enable_rx;
     bool enable_interrupt;
 } uart_config_extended_t;
-
 /* Statistics structure */
 typedef struct {
     uint32_t bytes_transmitted;
