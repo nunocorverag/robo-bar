@@ -128,8 +128,6 @@ static void BOARD_InitGPIO(void)
     PORT_SetPinMux(SERVO_2_PORT, SERVO_2_PIN, kPORT_MuxAlt3);
     PORT_SetPinMux(SERVO_3_PORT, SERVO_3_PIN, kPORT_MuxAlt3);
     PORT_SetPinMux(SERVO_4_PORT, SERVO_4_PIN, kPORT_MuxAlt4);
-    PORT_SetPinMux(SERVO_5_PORT, SERVO_5_PIN, kPORT_MuxAlt3);
-    PORT_SetPinMux(SERVO_6_PORT, SERVO_6_PIN, kPORT_MuxAlt3);
     PORT_SetPinMux(DIRECTION_SERVO_PORT, DIRECTION_SERVO_PIN, kPORT_MuxAlt4);
     
     /* Initialize sensor pins as digital inputs */
@@ -139,26 +137,14 @@ static void BOARD_InitGPIO(void)
     PORT_SetPinMux(SENSOR_2_PORT, SENSOR_2_PIN, kPORT_MuxAsGpio);
     PORT_SetPinMux(SENSOR_3_PORT, SENSOR_3_PIN, kPORT_MuxAsGpio);
     PORT_SetPinMux(SENSOR_4_PORT, SENSOR_4_PIN, kPORT_MuxAsGpio);
-    PORT_SetPinMux(SENSOR_5_PORT, SENSOR_5_PIN, kPORT_MuxAsGpio);
-    PORT_SetPinMux(SENSOR_6_PORT, SENSOR_6_PIN, kPORT_MuxAsGpio);
     
     GPIO_PinInit(SENSOR_1_GPIO, SENSOR_1_PIN, &gpio_config);
     GPIO_PinInit(SENSOR_2_GPIO, SENSOR_2_PIN, &gpio_config);
     GPIO_PinInit(SENSOR_3_GPIO, SENSOR_3_PIN, &gpio_config);
     GPIO_PinInit(SENSOR_4_GPIO, SENSOR_4_PIN, &gpio_config);
-    GPIO_PinInit(SENSOR_5_GPIO, SENSOR_5_PIN, &gpio_config);
-    GPIO_PinInit(SENSOR_6_GPIO, SENSOR_6_PIN, &gpio_config);
     
     /* Initialize motor control pins */
     gpio_config.pinDirection = kGPIO_DigitalOutput;
-    
-    PORT_SetPinMux(CONVEYOR_IN1_PORT, CONVEYOR_IN1_PIN, kPORT_MuxAsGpio);
-    PORT_SetPinMux(CONVEYOR_IN2_PORT, CONVEYOR_IN2_PIN, kPORT_MuxAsGpio);
-    PORT_SetPinMux(CONVEYOR_ENA_PORT, CONVEYOR_ENA_PIN, kPORT_MuxAsGpio);
-    
-    GPIO_PinInit(CONVEYOR_IN1_GPIO, CONVEYOR_IN1_PIN, &gpio_config);
-    GPIO_PinInit(CONVEYOR_IN2_GPIO, CONVEYOR_IN2_PIN, &gpio_config);
-    GPIO_PinInit(CONVEYOR_ENA_GPIO, CONVEYOR_ENA_PIN, &gpio_config);
     
     PORT_SetPinMux(MIXING_IN1_PORT, MIXING_IN1_PIN, kPORT_MuxAsGpio);
     PORT_SetPinMux(MIXING_IN2_PORT, MIXING_IN2_PIN, kPORT_MuxAsGpio);
@@ -301,10 +287,10 @@ static void BOARD_InitI2C(void)
  ******************************************************************************/
 static void LED_SetColor(bool red, bool green, bool blue)
 {
-    /* LEDs are active low */
-    GPIO_WritePinOutput(LED_RED_GPIO, LED_RED_PIN, 1);
-    GPIO_WritePinOutput(LED_GREEN_GPIO, LED_GREEN_PIN, 1);
-    GPIO_WritePinOutput(LED_BLUE_GPIO, LED_BLUE_PIN, 1);
+    /* LEDs are active low - invertir la lógica */
+    GPIO_WritePinOutput(LED_RED_GPIO, LED_RED_PIN, !red);
+    GPIO_WritePinOutput(LED_GREEN_GPIO, LED_GREEN_PIN, !green);
+    GPIO_WritePinOutput(LED_BLUE_GPIO, LED_BLUE_PIN, !blue);
 }
 
 static void LED_Test_Sequence(void)
@@ -450,8 +436,6 @@ void vTaskSystemMonitor(void *pvParameters)
         sensor_states[1] = GPIO_ReadPinInput(SENSOR_2_GPIO, SENSOR_2_PIN);
         sensor_states[2] = GPIO_ReadPinInput(SENSOR_3_GPIO, SENSOR_3_PIN);
         sensor_states[3] = GPIO_ReadPinInput(SENSOR_4_GPIO, SENSOR_4_PIN);
-        sensor_states[4] = GPIO_ReadPinInput(SENSOR_5_GPIO, SENSOR_5_PIN);
-        sensor_states[5] = GPIO_ReadPinInput(SENSOR_6_GPIO, SENSOR_6_PIN);
         
         /* Print status every 10 seconds */
         if (monitor_count % 10 == 0) {
@@ -552,9 +536,12 @@ int main(void)
     BOARD_InitI2C();
     
     /* Initial LED test to show system is alive */
+    /* Quick LED test to show system is alive - REMOVED BLOCKING DELAY */
     LED_SetColor(true, true, true); /* White */
     for (volatile int i = 0; i < 1000000; i++); /* Simple delay */
     LED_SetColor(false, false, false); /* Off */
+    
+    Debug_Printf("\r\n\r\nRobo-Bar System Starting...\r\n");
     
     /* Create FreeRTOS synchronization objects */
     xQueueSystemMessages = xQueueCreate(10, sizeof(system_message_t));

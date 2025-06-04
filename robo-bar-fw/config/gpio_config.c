@@ -18,9 +18,7 @@ const gpio_pin_config_extended_t servo_pins[SERVO_COUNT] = {
     {SERVO_1_PORT, SERVO_1_GPIO, SERVO_1_PIN, kPORT_MuxAlt4, kGPIO_DigitalOutput, 0},
     {SERVO_2_PORT, SERVO_2_GPIO, SERVO_2_PIN, kPORT_MuxAlt3, kGPIO_DigitalOutput, 0},
     {SERVO_3_PORT, SERVO_3_GPIO, SERVO_3_PIN, kPORT_MuxAlt3, kGPIO_DigitalOutput, 0},
-    {SERVO_4_PORT, SERVO_4_GPIO, SERVO_4_PIN, kPORT_MuxAlt4, kGPIO_DigitalOutput, 0},
-    {SERVO_5_PORT, SERVO_5_GPIO, SERVO_5_PIN, kPORT_MuxAlt3, kGPIO_DigitalOutput, 0},
-    {SERVO_6_PORT, SERVO_6_GPIO, SERVO_6_PIN, kPORT_MuxAlt3, kGPIO_DigitalOutput, 0}
+    {SERVO_4_PORT, SERVO_4_GPIO, SERVO_4_PIN, kPORT_MuxAlt4, kGPIO_DigitalOutput, 0}
 };
 
 /* Water level sensor pins configuration */
@@ -35,11 +33,6 @@ const gpio_input_config_t sensor_pins[WATER_LEVEL_SENSORS_COUNT] = {
 
 /* Motor control pins configuration */
 const gpio_pin_config_extended_t motor_control_pins[] = {
-    /* Conveyor motor pins */
-    {CONVEYOR_IN1_PORT, CONVEYOR_IN1_GPIO, CONVEYOR_IN1_PIN, kPORT_MuxAsGpio, kGPIO_DigitalOutput, 0},
-    {CONVEYOR_IN2_PORT, CONVEYOR_IN2_GPIO, CONVEYOR_IN2_PIN, kPORT_MuxAsGpio, kGPIO_DigitalOutput, 0},
-    {CONVEYOR_ENA_PORT, CONVEYOR_ENA_GPIO, CONVEYOR_ENA_PIN, kPORT_MuxAsGpio, kGPIO_DigitalOutput, 0},
-    /* Mixing motor pins */
     {MIXING_IN1_PORT, MIXING_IN1_GPIO, MIXING_IN1_PIN, kPORT_MuxAsGpio, kGPIO_DigitalOutput, 0},
     {MIXING_IN2_PORT, MIXING_IN2_GPIO, MIXING_IN2_PIN, kPORT_MuxAsGpio, kGPIO_DigitalOutput, 0},
     {MIXING_ENA_PORT, MIXING_ENA_GPIO, MIXING_ENA_PIN, kPORT_MuxAsGpio, kGPIO_DigitalOutput, 0}
@@ -173,7 +166,7 @@ void gpio_config_init_all(void)
     gpio_config_init_motors();
     gpio_config_init_keypad();
     gpio_config_init_lcd_i2c();
-    gpio_config_init_additional_sensors();
+    gpio_config_init_emergency_stop();
 }
 
 /*!
@@ -256,8 +249,8 @@ void gpio_config_init_lcd_i2c(void)
 {
     port_pin_config_t port_config = {0};
     
-    /* Enable PORTE clock */
-    CLOCK_EnableClock(kCLOCK_PortE);
+    /* Enable PORTC clock - CAMBIAR de PORTE a PORTC */
+    CLOCK_EnableClock(kCLOCK_PortC);
     
     /* Configure I2C pins */
     port_config.pullSelect = kPORT_PullUp;
@@ -265,7 +258,7 @@ void gpio_config_init_lcd_i2c(void)
     port_config.passiveFilterEnable = kPORT_PassiveFilterDisable;
     port_config.openDrainEnable = kPORT_OpenDrainEnable;
     port_config.driveStrength = kPORT_LowDriveStrength;
-    port_config.mux = kPORT_MuxAlt5; /* I2C function */
+    port_config.mux = kPORT_MuxAlt2; /* CAMBIAR de kPORT_MuxAlt5 a kPORT_MuxAlt2 para PORTC I2C */
     
     /* Configure SDA pin */
     PORT_SetPinConfig(LCD_I2C_SDA_PORT, LCD_I2C_SDA_PIN, &port_config);
@@ -273,35 +266,21 @@ void gpio_config_init_lcd_i2c(void)
     /* Configure SCL pin */
     PORT_SetPinConfig(LCD_I2C_SCL_PORT, LCD_I2C_SCL_PIN, &port_config);
 }
-
 /*!
  * @brief Initialize additional sensor pins
  */
-void gpio_config_init_additional_sensors(void)
+void gpio_config_init_emergency_stop(void)
 {
-    gpio_input_config_t position_sensor_1_config = {
-        POSITION_SENSOR_1_PORT, POSITION_SENSOR_1_GPIO, POSITION_SENSOR_1_PIN, 
-        kPORT_MuxAsGpio, true
-    };
-    
-    gpio_input_config_t position_sensor_2_config = {
-        POSITION_SENSOR_2_PORT, POSITION_SENSOR_2_GPIO, POSITION_SENSOR_2_PIN, 
-        kPORT_MuxAsGpio, true
-    };
-    
     gpio_input_config_t emergency_stop_config = {
         EMERGENCY_STOP_PORT, EMERGENCY_STOP_GPIO, EMERGENCY_STOP_PIN, 
         kPORT_MuxAsGpio, true
     };
     
-    /* Configure position sensors */
-    gpio_configure_input_pin(&position_sensor_1_config);
-    gpio_configure_input_pin(&position_sensor_2_config);
-    
     /* Configure emergency stop button */
     gpio_configure_input_pin(&emergency_stop_config);
+    
+    // ELIMINAR position sensors
 }
-
 /*******************************************************************************
  * LED Control Functions
  ******************************************************************************/

@@ -33,8 +33,8 @@
  ******************************************************************************/
 
 /* Liquid Dispensing System */
-#define SERVO_COUNT                 6U           /* Number of servo motors */
-#define WATER_LEVEL_SENSORS_COUNT   6U           /* Number of level sensors */
+#define SERVO_COUNT                 4U           /* Number of servo motors */
+#define WATER_LEVEL_SENSORS_COUNT   4U           /* Number of level sensors */
 #define MAX_DISPENSE_TIME_MS        5000U        /* Maximum dispense time */
 
 /* User Interface */
