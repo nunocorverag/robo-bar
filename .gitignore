@@ -29,3 +29,6 @@ ZephyrRTOS_TAD_logs/
 Thumbs.db
 *.bak
 *.swp
+
+#VS Code workspace files
+/.vscode/
