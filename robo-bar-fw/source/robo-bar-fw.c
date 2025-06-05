@@ -187,53 +187,102 @@ static void BOARD_InitGPIO(void)
     GPIO_PinInit(KEYPAD_COL4_GPIO, KEYPAD_COL4_PIN, &gpio_config);
 }
 
+
+/*******************************************************************************
+ * Debug Print Function
+ ******************************************************************************/
+static void Debug_Printf(const char* format, ...)
+{
+    if (xSemaphoreUART != NULL) {
+        if (xSemaphoreTake(xSemaphoreUART, pdMS_TO_TICKS(100)) == pdTRUE) {
+            va_list args;
+            char buffer[256];
+            
+            va_start(args, format);
+            vsnprintf(buffer, sizeof(buffer), format, args);
+            va_end(args);
+            
+            /* Send string via UART */
+            for (int i = 0; buffer[i] != '\0'; i++) {
+                while (!(UART0->S1 & UART_S1_TDRE_MASK));
+                UART0->D = buffer[i];
+            }
+            
+            xSemaphoreGive(xSemaphoreUART);
+        }
+    }
+}
+
 /*******************************************************************************
  * PWM Initialization
  ******************************************************************************/
 static void BOARD_InitPWM(void)
 {
     tpm_config_t tpmInfo;
-    tpm_chnl_pwm_signal_param_t tpmParam;
+    tpm_chnl_pwm_signal_param_t tpmParam[6]; // Array para todos los servos
     
-    /* Initialize TPM modules */
+    /* Obtener configuración por defecto */
     TPM_GetDefaultConfig(&tpmInfo);
-    tpmInfo.prescale = kTPM_Prescale_Divide_4;
     
+    /* CRÍTICO: Configurar prescaler para obtener exactamente 50Hz */
+    /* Con clock de 48MHz y prescaler /16: 48MHz/16 = 3MHz */
+    /* Para 50Hz necesitamos: 3MHz/50Hz = 60000 counts */
+    tpmInfo.prescale = kTPM_Prescale_Divide_16;
+    
+    /* Inicializar módulos TPM */
     TPM_Init(TPM0, &tpmInfo);
     TPM_Init(TPM1, &tpmInfo);
     TPM_Init(TPM2, &tpmInfo);
     
-    /* Configure PWM parameters for servo control */
-    tpmParam.chnlNumber = kTPM_Chnl_4;
-    tpmParam.level = kTPM_HighTrue;
-    tpmParam.dutyCyclePercent = 7.5; /* 1.5ms pulse width at 20ms period */
+    /* Configurar parámetros PWM para servos */
+    /* Servo 1 - TPM0 Channel 4 (PTD4) */
+    tpmParam[0].chnlNumber = kTPM_Chnl_4;
+    tpmParam[0].level = kTPM_HighTrue;
+    tpmParam[0].dutyCyclePercent = 7.5; /* 1.5ms pulse = posición central */
     
-    /* Configure servo PWM channels */
-    tpmParam.chnlNumber = kTPM_Chnl_4;
-    TPM_SetupPwm(TPM0, &tpmParam, 1U, kTPM_EdgeAlignedPwm, 50U, CLOCK_GetFreq(kCLOCK_PllFllSelClk));
+    /* Servo 2 - TPM0 Channel 5 (PTD5) */
+    tpmParam[1].chnlNumber = kTPM_Chnl_5;
+    tpmParam[1].level = kTPM_HighTrue;
+    tpmParam[1].dutyCyclePercent = 7.5;
     
-    tpmParam.chnlNumber = kTPM_Chnl_5;
-    TPM_SetupPwm(TPM0, &tpmParam, 1U, kTPM_EdgeAlignedPwm, 50U, CLOCK_GetFreq(kCLOCK_PllFllSelClk));
+    /* Servo 3 - TPM1 Channel 0 (PTA12) */
+    tpmParam[2].chnlNumber = kTPM_Chnl_0;
+    tpmParam[2].level = kTPM_HighTrue;
+    tpmParam[2].dutyCyclePercent = 7.5;
     
-    tpmParam.chnlNumber = kTPM_Chnl_6;
-    TPM_SetupPwm(TPM0, &tpmParam, 1U, kTPM_EdgeAlignedPwm, 50U, CLOCK_GetFreq(kCLOCK_PllFllSelClk));
+    /* Servo 4 - TPM1 Channel 1 (PTA13) */
+    tpmParam[3].chnlNumber = kTPM_Chnl_1;
+    tpmParam[3].level = kTPM_HighTrue;
+    tpmParam[3].dutyCyclePercent = 7.5;
     
-    tpmParam.chnlNumber = kTPM_Chnl_0;
-    TPM_SetupPwm(TPM1, &tpmParam, 1U, kTPM_EdgeAlignedPwm, 50U, CLOCK_GetFreq(kCLOCK_PllFllSelClk));
+    /* Direction Servo - TPM2 Channel 0 (PTE20) */
+    tpmParam[4].chnlNumber = kTPM_Chnl_0;
+    tpmParam[4].level = kTPM_HighTrue;
+    tpmParam[4].dutyCyclePercent = 7.5;
     
-    tpmParam.chnlNumber = kTPM_Chnl_1;
-    TPM_SetupPwm(TPM1, &tpmParam, 1U, kTPM_EdgeAlignedPwm, 50U, CLOCK_GetFreq(kCLOCK_PllFllSelClk));
+    /* Setup PWM con frecuencia exacta de 50Hz */
+    uint32_t pwm_freq = CLOCK_GetFreq(kCLOCK_PllFllSelClk);
     
-    tpmParam.chnlNumber = kTPM_Chnl_0;
-    TPM_SetupPwm(TPM2, &tpmParam, 1U, kTPM_EdgeAlignedPwm, 50U, CLOCK_GetFreq(kCLOCK_PllFllSelClk));
+    /* TPM0 - Servos 1 y 2 */
+    TPM_SetupPwm(TPM0, &tpmParam[0], 2U, kTPM_EdgeAlignedPwm, 50U, pwm_freq);
     
-    tpmParam.chnlNumber = kTPM_Chnl_1;
-    TPM_SetupPwm(TPM2, &tpmParam, 1U, kTPM_EdgeAlignedPwm, 50U, CLOCK_GetFreq(kCLOCK_PllFllSelClk));
+    /* TPM1 - Servos 3 y 4 */  
+    TPM_SetupPwm(TPM1, &tpmParam[2], 2U, kTPM_EdgeAlignedPwm, 50U, pwm_freq);
     
-    /* Start TPM modules */
+    /* TPM2 - Direction Servo */
+    TPM_SetupPwm(TPM2, &tpmParam[4], 1U, kTPM_EdgeAlignedPwm, 50U, pwm_freq);
+    
+    /* IMPORTANTE: Iniciar los módulos TPM */
     TPM_StartTimer(TPM0, kTPM_SystemClock);
     TPM_StartTimer(TPM1, kTPM_SystemClock);
     TPM_StartTimer(TPM2, kTPM_SystemClock);
+    
+    /* Debug: Verificar configuración */
+    Debug_Printf("PWM Configuration:\r\n");
+    Debug_Printf("- TPM0 MOD: %u\r\n", TPM0->MOD);
+    Debug_Printf("- TPM1 MOD: %u\r\n", TPM1->MOD);
+    Debug_Printf("- TPM2 MOD: %u\r\n", TPM2->MOD);
+    Debug_Printf("- PWM Frequency: %u Hz\r\n", pwm_freq);
 }
 
 /*******************************************************************************
@@ -311,31 +360,6 @@ static void LED_Test_Sequence(void)
 }
 
 /*******************************************************************************
- * Debug Print Function
- ******************************************************************************/
-static void Debug_Printf(const char* format, ...)
-{
-    if (xSemaphoreUART != NULL) {
-        if (xSemaphoreTake(xSemaphoreUART, pdMS_TO_TICKS(100)) == pdTRUE) {
-            va_list args;
-            char buffer[256];
-            
-            va_start(args, format);
-            vsnprintf(buffer, sizeof(buffer), format, args);
-            va_end(args);
-            
-            /* Send string via UART */
-            for (int i = 0; buffer[i] != '\0'; i++) {
-                while (!(UART0->S1 & UART_S1_TDRE_MASK));
-                UART0->D = buffer[i];
-            }
-            
-            xSemaphoreGive(xSemaphoreUART);
-        }
-    }
-}
-
-/*******************************************************************************
  * FreeRTOS Tasks
  ******************************************************************************/
 
@@ -381,41 +405,111 @@ static void vTaskLedTest(void *pvParameters)
     }
 }
 
+static uint8_t Servo_AngleToDutyCycle(uint16_t angle_degrees)
+{
+    /* Los servos típicos necesitan:
+     * 0° = 1ms pulse = 5% duty cycle
+     * 90° = 1.5ms pulse = 7.5% duty cycle  
+     * 180° = 2ms pulse = 10% duty cycle
+     */
+    if (angle_degrees > 180) {
+        angle_degrees = 180;
+    }
+    
+    /* Mapear 0-180° a 5-10% duty cycle */
+    uint8_t duty_cycle = 5 + (angle_degrees * 5) / 180;
+    
+    return duty_cycle;
+}
+
+/* Mover servo específico a ángulo dado */
+static void Servo_SetAngle(uint8_t servo_id, uint16_t angle_degrees)
+{
+    uint8_t duty_cycle = Servo_AngleToDutyCycle(angle_degrees);
+    
+    switch (servo_id) {
+        case 1: /* Servo 1 - TPM0 CH4 */
+            TPM_UpdatePwmDutycycle(TPM0, kTPM_Chnl_4, kTPM_EdgeAlignedPwm, duty_cycle);
+            break;
+            
+        case 2: /* Servo 2 - TPM0 CH5 */
+            TPM_UpdatePwmDutycycle(TPM0, kTPM_Chnl_5, kTPM_EdgeAlignedPwm, duty_cycle);
+            break;
+            
+        case 3: /* Servo 3 - TPM1 CH0 */
+            TPM_UpdatePwmDutycycle(TPM1, kTPM_Chnl_0, kTPM_EdgeAlignedPwm, duty_cycle);
+            break;
+            
+        case 4: /* Servo 4 - TPM1 CH1 */
+            TPM_UpdatePwmDutycycle(TPM1, kTPM_Chnl_1, kTPM_EdgeAlignedPwm, duty_cycle);
+            break;
+            
+        case 5: /* Direction Servo - TPM2 CH0 */
+            TPM_UpdatePwmDutycycle(TPM2, kTPM_Chnl_0, kTPM_EdgeAlignedPwm, duty_cycle);
+            break;
+            
+        default:
+            Debug_Printf("Error: Invalid servo ID %u\r\n", servo_id);
+            break;
+    }
+}
+
+
 /* Servo Test Task */
 static void vTaskServoTest(void *pvParameters)
 {
-    uint8_t servo_angle = 90; /* Start at neutral position */
+    uint16_t servo_angle = 90; /* Empezar en posición central */
     bool increasing = true;
+    uint8_t current_servo = 1; /* Probar servos uno por uno */
+    uint32_t test_cycle = 0;
     
-    Debug_Printf("Servo Test Task started\r\n");
+    Debug_Printf("Servo Test Task started (FIXED VERSION)\r\n");
+    
+    /* Posicionar todos los servos en centro inicialmente */
+    for (uint8_t i = 1; i <= 5; i++) {
+        Servo_SetAngle(i, 90);
+        vTaskDelay(pdMS_TO_TICKS(500)); /* Dar tiempo al servo */
+    }
+    
+    Debug_Printf("All servos positioned to center (90°)\r\n");
     
     while (1) {
         /* Test servo angle sweep */
         if (increasing) {
-            servo_angle += 10;
+            servo_angle += 15; /* Incrementos más grandes para ver movimiento */
             if (servo_angle >= 180) {
                 servo_angle = 180;
                 increasing = false;
             }
         } else {
-            servo_angle -= 10;
+            servo_angle -= 15;
             if (servo_angle <= 0) {
                 servo_angle = 0;
                 increasing = true;
-                g_servo_test_count++;
+                
+                /* Cambiar al siguiente servo */
+                current_servo++;
+                if (current_servo > 5) {
+                    current_servo = 1;
+                    test_cycle++;
+                }
+                
+                Debug_Printf("Testing Servo %u - Cycle %lu completed\r\n", 
+                           current_servo, test_cycle);
             }
         }
         
-        /* Update PWM duty cycle for servo position */
-        uint8_t duty_cycle = 5 + (servo_angle * 5) / 180; /* 5% to 10% duty cycle */
-        TPM_UpdatePwmDutycycle(TPM0, kTPM_Chnl_4, kTPM_EdgeAlignedPwm, duty_cycle);
+        /* Actualizar servo actual */
+        Servo_SetAngle(current_servo, servo_angle);
         
-        if (g_servo_test_count > 0 && (g_servo_test_count % 5 == 0)) {
-            Debug_Printf("Servo Test: %lu sweep cycles completed\r\n", g_servo_test_count);
-            g_servo_test_count++; /* Prevent repeated messages */
+        /* Debug cada 45° */
+        if (servo_angle % 45 == 0) {
+            Debug_Printf("Servo %u -> %u° (DC: %u%%)\r\n", 
+                       current_servo, servo_angle, Servo_AngleToDutyCycle(servo_angle));
         }
         
-        vTaskDelay(pdMS_TO_TICKS(100));
+        /* Delay más largo para ver el movimiento claramente */
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
@@ -560,6 +654,7 @@ int main(void)
         /* Creation failed - indicate with red LED */
         LED_SetColor(true, false, false);
         g_system_state = SYSTEM_STATE_ERROR;
+
         g_last_error = SYSTEM_ERROR_MEMORY;
         
         /* Infinite loop with error indication */

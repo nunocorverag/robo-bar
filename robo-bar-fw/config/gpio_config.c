@@ -18,7 +18,7 @@ const gpio_pin_config_extended_t servo_pins[SERVO_COUNT] = {
     {SERVO_1_PORT, SERVO_1_GPIO, SERVO_1_PIN, kPORT_MuxAlt4, kGPIO_DigitalOutput, 0},
     {SERVO_2_PORT, SERVO_2_GPIO, SERVO_2_PIN, kPORT_MuxAlt3, kGPIO_DigitalOutput, 0},
     {SERVO_3_PORT, SERVO_3_GPIO, SERVO_3_PIN, kPORT_MuxAlt3, kGPIO_DigitalOutput, 0},
-    {SERVO_4_PORT, SERVO_4_GPIO, SERVO_4_PIN, kPORT_MuxAlt4, kGPIO_DigitalOutput, 0}
+    {SERVO_4_PORT, SERVO_4_GPIO, SERVO_4_PIN, kPORT_MuxAlt4, kGPIO_DigitalOutput, 0},
 };
 
 /* Water level sensor pins configuration */
@@ -35,7 +35,7 @@ const gpio_input_config_t sensor_pins[WATER_LEVEL_SENSORS_COUNT] = {
 const gpio_pin_config_extended_t motor_control_pins[] = {
     {MIXING_IN1_PORT, MIXING_IN1_GPIO, MIXING_IN1_PIN, kPORT_MuxAsGpio, kGPIO_DigitalOutput, 0},
     {MIXING_IN2_PORT, MIXING_IN2_GPIO, MIXING_IN2_PIN, kPORT_MuxAsGpio, kGPIO_DigitalOutput, 0},
-    {MIXING_ENA_PORT, MIXING_ENA_GPIO, MIXING_ENA_PIN, kPORT_MuxAsGpio, kGPIO_DigitalOutput, 0}
+    {MIXING_ENA_PORT, MIXING_ENA_GPIO, MIXING_ENA_PIN, kPORT_MuxAsGpio, kGPIO_DigitalOutput, 0},
 };
 
 /* Keypad row pins configuration */
@@ -185,7 +185,7 @@ void gpio_config_init_leds(void)
  */
 void gpio_config_init_servos(void)
 {
-    gpio_pin_config_extended_t direction_servo_config = {
+    const gpio_pin_config_extended_t direction_servo_config = {
         DIRECTION_SERVO_PORT, DIRECTION_SERVO_GPIO, DIRECTION_SERVO_PIN, 
         kPORT_MuxAlt4, kGPIO_DigitalOutput, 0
     };

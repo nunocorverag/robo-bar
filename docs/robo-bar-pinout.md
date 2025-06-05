@@ -1,6 +1,6 @@
-# Robo-Bar Pinout and Connections (FRDM-KL25Z)
+# Robo-Bar Project - Pinout and Connections (FRDM-KL25Z)
 
-This document lists all pin connections used in the Robo-Bar project on the FRDM-KL25Z board.
+Este documento lista todas las conexiones de pines usadas en el proyecto Robo-Bar en la placa FRDM-KL25Z.
 
 ---
 
@@ -22,6 +22,7 @@ This document lists all pin connections used in the Robo-Bar project on the FRDM
 | Servo 2         | PORTA    | 12         | TPM1_CH0    | Liquid dispensing servo 2     |
 | Servo 3         | PORTA    | 13         | TPM1_CH1    | Liquid dispensing servo 3     |
 | Servo 4         | PORTD    | 5          | TPM0_CH5    | Liquid dispensing servo 4     |
+| Direction Servo | PORTD    | 6          | TPM0_CH6    | Servo to control direction    |
 
 ---
 
@@ -67,6 +68,16 @@ This document lists all pin connections used in the Robo-Bar project on the FRDM
 
 | Device           | MCU Port | Pin Number | Description              |
 |------------------|----------|------------|--------------------------|
-| Emergency Stop    | PORTC    | 12         | Emergency stop button    |
+| Emergency Stop   | PORTC    | 12         | Emergency stop button    |
+
+---
+
+## H-Bridge Motor Control
+
+| Signal        | MCU Port  | Pin Number | Description         |
+|---------------|-----------|------------|---------------------|
+| Motor Control | PORTE     | 23         | H-Bridge Input 1 (Motor direction control)  |
+| Motor Control | PORTE     | 29         | H-Bridge Input 2 (Motor direction control)  |
+| Motor Enable  | PORTE     | 30         | H-Bridge Enable (Motor enable)  |
 
 ---
