@@ -20,12 +20,11 @@
  * PWM Configuration Constants
  ******************************************************************************/
 #define PWM_FREQUENCY_HZ            SERVO_PWM_FREQUENCY_HZ    /* 50 Hz for servos */
-#define PWM_PERIOD_TICKS            (SYSTEM_BUS_CLOCK_HZ / PWM_FREQUENCY_HZ)
+#define PWM_PERIOD_TICKS    20833U  // Para 20ms a 48MHz con prescaler /4
+#define SERVO_MIN_PULSE     1041U   // 1ms = 0°
+#define SERVO_CENTER_PULSE  1562U   // 1.5ms = 90°
+#define SERVO_MAX_PULSE     2083U   // 2ms = 180°
 
-/* Servo pulse widths in microseconds */
-#define SERVO_PULSE_MIN_US          1000U    /* 1ms - 0° position */
-#define SERVO_PULSE_MAX_US          2000U    /* 2ms - 180° position */
-#define SERVO_PULSE_NEUTRAL_US      1500U    /* 1.5ms - 90° position */
 
 /* Convert microseconds to timer ticks */
 #define US_TO_TICKS(us)             ((us * SYSTEM_BUS_CLOCK_HZ) / 1000000U)

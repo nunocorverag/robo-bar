@@ -241,25 +241,26 @@ static void BOARD_InitPWM(void)
  ******************************************************************************/
 static void BOARD_InitUART(void)
 {
-    uart_config_t config;
-    
-    /* Configure UART pins */
-    PORT_SetPinMux(DEBUG_UART_TX_PORT, DEBUG_UART_TX_PIN, DEBUG_UART_TX_PIN_MUX);
-    PORT_SetPinMux(DEBUG_UART_RX_PORT, DEBUG_UART_RX_PIN, DEBUG_UART_RX_PIN_MUX);
-    
-    /* Get default UART configuration */
-    UART_GetDefaultConfig(&config);
-    config.baudRate_Bps = DEBUG_UART_BAUDRATE;
-    config.enableTx = true;
-    config.enableRx = true;
-    
-    /* Use correct clock source */
-    UART_Init(DEBUG_UART, &config, CLOCK_GetFreq(kCLOCK_CoreSysClk));
-    
-    /* Enable UART interrupts */
-    UART_EnableInterrupts(DEBUG_UART, kUART_RxDataRegFullInterruptEnable);
-    EnableIRQ(DEBUG_UART_IRQ);
+    // Use the same method that works
+    SIM->SCGC4 |= 0x0400;       // Enable clock for UART0
+    SIM->SCGC5 |= 0x0200;       // Enable clock for PORTA
+    SIM->SOPT2 |= 0x04000000;   // Use FLL output for the baud rate generator
+   
+    // Configure pins
+    PORTA->PCR[1] = 0x0200;     // PTA1 as UART0_RX
+    PORTA->PCR[2] = 0x0200;     // PTA2 as UART0_TX
+   
+    // Configure UART
+    UART0->C2 = 0;              // Turn off UART0
+    UART0->BDH = 0x00;          
+    UART0->BDL = 0x17;          // 115200 baud
+    UART0->C4 = 0x0F;          
+    UART0->C1 = 0x00;          
+    UART0->C2 = 0x2C;           // Enable TX, RX, and interrupts
+   
+    NVIC_EnableIRQ(UART0_IRQn);
 }
+
 /*******************************************************************************
  * I2C Initialization for LCD
  ******************************************************************************/
@@ -538,16 +539,14 @@ int main(void)
     /* Initial LED test to show system is alive */
     /* Quick LED test to show system is alive - REMOVED BLOCKING DELAY */
     LED_SetColor(true, true, true); /* White */
-    for (volatile int i = 0; i < 1000000; i++); /* Simple delay */
-    LED_SetColor(false, false, false); /* Off */
-    
-    Debug_Printf("\r\n\r\nRobo-Bar System Starting...\r\n");
-    
+        
     /* Create FreeRTOS synchronization objects */
     xQueueSystemMessages = xQueueCreate(10, sizeof(system_message_t));
     xSemaphoreUART = xSemaphoreCreateMutex();
     xEventGroupSystem = xEventGroupCreate();
     
+    Debug_Printf("\r\n\r\nRobo-Bar System Starting...\r\n");
+
     /* Create system heartbeat timer */
     xTimerSystemHeartbeat = xTimerCreate("Heartbeat",
                                         pdMS_TO_TICKS(1000),
