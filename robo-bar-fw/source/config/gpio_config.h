@@ -239,8 +239,6 @@ void gpio_pin_toggle(GPIO_Type *gpio, uint32_t pin);
 #define SERVO_2_INDEX       1
 #define SERVO_3_INDEX       2
 #define SERVO_4_INDEX       3
-#define SERVO_5_INDEX       4
-#define SERVO_6_INDEX       5
 #define DIRECTION_SERVO_INDEX 6
 
 /* Sensor indices */
@@ -248,7 +246,5 @@ void gpio_pin_toggle(GPIO_Type *gpio, uint32_t pin);
 #define WATER_SENSOR_2_INDEX    1
 #define WATER_SENSOR_3_INDEX    2
 #define WATER_SENSOR_4_INDEX    3
-#define WATER_SENSOR_5_INDEX    4
-#define WATER_SENSOR_6_INDEX    5
 
 #endif /* GPIO_CONFIG_H */

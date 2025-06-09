@@ -94,18 +94,28 @@
 #define TEMP_BUFFER_SIZE            128U         /* Temporary buffer size */
 
 /*******************************************************************************
+ * Task Priorities (0 = lowest, configMAX_PRIORITIES - 1 = highest)
+ ******************************************************************************/
+#define TASK_PRIORITY_SYSTEM_MONITOR     (configMAX_PRIORITIES - 2)
+#define TASK_PRIORITY_LED_STATUS         (configMAX_PRIORITIES - 3)
+#define TASK_PRIORITY_SERVO_CONTROL      (configMAX_PRIORITIES - 3)
+#define TASK_PRIORITY_SYSTEM_INIT        (configMAX_PRIORITIES - 1)
+
+/*******************************************************************************
  * System States
  ******************************************************************************/
 typedef enum {
     SYSTEM_STATE_INIT = 0,
     SYSTEM_STATE_IDLE,
+    SYSTEM_STATE_READY,
     SYSTEM_STATE_PREPARING,
     SYSTEM_STATE_DISPENSING,
     SYSTEM_STATE_MIXING,
     SYSTEM_STATE_SERVING,
     SYSTEM_STATE_CLEANING,
     SYSTEM_STATE_ERROR,
-    SYSTEM_STATE_MAINTENANCE
+    SYSTEM_STATE_MAINTENANCE,
+    SYSTEM_STATE_EMERGENCY
 } system_state_t;
 
 /*******************************************************************************

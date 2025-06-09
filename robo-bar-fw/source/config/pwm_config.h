@@ -93,17 +93,6 @@ typedef struct {
 #define SERVO_3_CLOCK_NAME          kCLOCK_Tpm1
 #define SERVO_3_CLOCK_IP            kCLOCK_Tpm1
 
-/* TPM2 Channels */
-#define SERVO_5_TPM                 TPM2
-#define SERVO_5_CHANNEL             0U
-#define SERVO_5_CLOCK_NAME          kCLOCK_Tpm2
-#define SERVO_5_CLOCK_IP            kCLOCK_Tpm2
-
-#define SERVO_6_TPM                 TPM2
-#define SERVO_6_CHANNEL             1U
-#define SERVO_6_CLOCK_NAME          kCLOCK_Tpm2
-#define SERVO_6_CLOCK_IP            kCLOCK_Tpm2
-
 /*******************************************************************************
  * Function Prototypes
  ******************************************************************************/

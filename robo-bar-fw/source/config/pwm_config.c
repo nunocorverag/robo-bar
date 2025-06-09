@@ -27,9 +27,6 @@ static const pwm_channel_config_t pwm_channels[] = {
     /* Servo 4 - TPM0 CH5 */
     {SERVO_4_TPM, SERVO_4_CHANNEL, SERVO_4_CLOCK_NAME, SERVO_4_CLOCK_IP},
     /* Servo 5 - TPM2 CH0 */
-    {SERVO_5_TPM, SERVO_5_CHANNEL, SERVO_5_CLOCK_NAME, SERVO_5_CLOCK_IP},
-    /* Servo 6 - TPM2 CH1 */
-    {SERVO_6_TPM, SERVO_6_CHANNEL, SERVO_6_CLOCK_NAME, SERVO_6_CLOCK_IP},
     /* Direction Servo - TPM0 CH6 */
     {DIRECTION_SERVO_TPM, DIRECTION_SERVO_CHANNEL, DIRECTION_SERVO_CLOCK_NAME, DIRECTION_SERVO_CLOCK_IP}
 };
@@ -186,7 +183,7 @@ void pwm_config_init_servo_channel(uint8_t servo_id)
     /* Initialize TPM module if not already done */
     pwm_config_init_tpm_module(channel_config->tpm_base, 
                                channel_config->clock_name, 
-                               channel_config->clock_ip);
+                               channel_config->clock_name);
     
     /* Configure PWM channel */
     pwm_param.chnlNumber = (tpm_chnl_t)channel_config->channel;

@@ -8,6 +8,8 @@
 #include "gpio_config.h"
 #include "system_config.h"
 #include "fsl_clock.h"
+#include "fsl_gpio.h"
+#include "fsl_port.h"
 
 /*******************************************************************************
  * Pin Configuration Arrays
@@ -18,7 +20,7 @@ const gpio_pin_config_extended_t servo_pins[SERVO_COUNT] = {
     {SERVO_1_PORT, SERVO_1_GPIO, SERVO_1_PIN, kPORT_MuxAlt4, kGPIO_DigitalOutput, 0},
     {SERVO_2_PORT, SERVO_2_GPIO, SERVO_2_PIN, kPORT_MuxAlt3, kGPIO_DigitalOutput, 0},
     {SERVO_3_PORT, SERVO_3_GPIO, SERVO_3_PIN, kPORT_MuxAlt3, kGPIO_DigitalOutput, 0},
-    {SERVO_4_PORT, SERVO_4_GPIO, SERVO_4_PIN, kPORT_MuxAlt4, kGPIO_DigitalOutput, 0},
+    {SERVO_4_PORT, SERVO_4_GPIO, SERVO_4_PIN, kPORT_MuxAlt4, kGPIO_DigitalOutput, 0}
 };
 
 /* Water level sensor pins configuration */
@@ -26,9 +28,7 @@ const gpio_input_config_t sensor_pins[WATER_LEVEL_SENSORS_COUNT] = {
     {SENSOR_1_PORT, SENSOR_1_GPIO, SENSOR_1_PIN, kPORT_MuxAsGpio, true},
     {SENSOR_2_PORT, SENSOR_2_GPIO, SENSOR_2_PIN, kPORT_MuxAsGpio, true},
     {SENSOR_3_PORT, SENSOR_3_GPIO, SENSOR_3_PIN, kPORT_MuxAsGpio, true},
-    {SENSOR_4_PORT, SENSOR_4_GPIO, SENSOR_4_PIN, kPORT_MuxAsGpio, true},
-    {SENSOR_5_PORT, SENSOR_5_GPIO, SENSOR_5_PIN, kPORT_MuxAsGpio, true},
-    {SENSOR_6_PORT, SENSOR_6_GPIO, SENSOR_6_PIN, kPORT_MuxAsGpio, true}
+    {SENSOR_4_PORT, SENSOR_4_GPIO, SENSOR_4_PIN, kPORT_MuxAsGpio, true}
 };
 
 /* Motor control pins configuration */
@@ -109,7 +109,6 @@ static void gpio_configure_pin(const gpio_pin_config_extended_t *config)
     port_config.pullSelect = kPORT_PullDisable;
     port_config.slewRate = kPORT_FastSlewRate;
     port_config.passiveFilterEnable = kPORT_PassiveFilterDisable;
-    port_config.openDrainEnable = kPORT_OpenDrainDisable;
     port_config.driveStrength = kPORT_LowDriveStrength;
     port_config.mux = config->mux;
     
@@ -138,7 +137,6 @@ static void gpio_configure_input_pin(const gpio_input_config_t *config)
     port_config.pullSelect = config->enable_pullup ? kPORT_PullUp : kPORT_PullDisable;
     port_config.slewRate = kPORT_FastSlewRate;
     port_config.passiveFilterEnable = kPORT_PassiveFilterDisable;
-    port_config.openDrainEnable = kPORT_OpenDrainDisable;
     port_config.driveStrength = kPORT_LowDriveStrength;
     port_config.mux = config->mux;
     
@@ -256,7 +254,6 @@ void gpio_config_init_lcd_i2c(void)
     port_config.pullSelect = kPORT_PullUp;
     port_config.slewRate = kPORT_FastSlewRate;
     port_config.passiveFilterEnable = kPORT_PassiveFilterDisable;
-    port_config.openDrainEnable = kPORT_OpenDrainEnable;
     port_config.driveStrength = kPORT_LowDriveStrength;
     port_config.mux = kPORT_MuxAlt2; /* CAMBIAR de kPORT_MuxAlt5 a kPORT_MuxAlt2 para PORTC I2C */
     
@@ -370,57 +367,33 @@ uint8_t gpio_sensors_read_all(void)
 
 /*!
  * @brief Set motor direction
- * @param motor_index Motor index (0=Conveyor, 1=Mixing)
  * @param forward Direction (true=forward, false=reverse)
  */
-void gpio_motor_set_direction(uint8_t motor_index, bool forward)
+void gpio_motor_set_direction(bool forward)
 {
-    if (motor_index == CONVEYOR_MOTOR_INDEX)
-    {
-        GPIO_PinWrite(CONVEYOR_IN1_GPIO, CONVEYOR_IN1_PIN, forward ? 1 : 0);
-        GPIO_PinWrite(CONVEYOR_IN2_GPIO, CONVEYOR_IN2_PIN, forward ? 0 : 1);
-    }
-    else if (motor_index == MIXING_MOTOR_INDEX)
-    {
-        GPIO_PinWrite(MIXING_IN1_GPIO, MIXING_IN1_PIN, forward ? 1 : 0);
-        GPIO_PinWrite(MIXING_IN2_GPIO, MIXING_IN2_PIN, forward ? 0 : 1);
-    }
+    GPIO_PinWrite(MIXING_IN1_GPIO, MIXING_IN1_PIN, forward ? 1 : 0);
+    GPIO_PinWrite(MIXING_IN2_GPIO, MIXING_IN2_PIN, forward ? 0 : 1);
 }
+
 
 /*!
  * @brief Stop motor
- * @param motor_index Motor index (0=Conveyor, 1=Mixing)
  */
-void gpio_motor_stop(uint8_t motor_index)
+void gpio_motor_stop(void)
 {
-    if (motor_index == CONVEYOR_MOTOR_INDEX)
-    {
-        GPIO_PinWrite(CONVEYOR_IN1_GPIO, CONVEYOR_IN1_PIN, 0);
-        GPIO_PinWrite(CONVEYOR_IN2_GPIO, CONVEYOR_IN2_PIN, 0);
-    }
-    else if (motor_index == MIXING_MOTOR_INDEX)
-    {
-        GPIO_PinWrite(MIXING_IN1_GPIO, MIXING_IN1_PIN, 0);
-        GPIO_PinWrite(MIXING_IN2_GPIO, MIXING_IN2_PIN, 0);
-    }
+    GPIO_PinWrite(MIXING_IN1_GPIO, MIXING_IN1_PIN, 0);
+    GPIO_PinWrite(MIXING_IN2_GPIO, MIXING_IN2_PIN, 0);
 }
 
 /*!
  * @brief Enable/disable motor
- * @param motor_index Motor index (0=Conveyor, 1=Mixing)
  * @param enable Enable state (true=enable, false=disable)
  */
-void gpio_motor_set_enable(uint8_t motor_index, bool enable)
+void gpio_motor_set_enable(bool enable)
 {
-    if (motor_index == CONVEYOR_MOTOR_INDEX)
-    {
-        GPIO_PinWrite(CONVEYOR_ENA_GPIO, CONVEYOR_ENA_PIN, enable ? 1 : 0);
-    }
-    else if (motor_index == MIXING_MOTOR_INDEX)
-    {
-        GPIO_PinWrite(MIXING_ENA_GPIO, MIXING_ENA_PIN, enable ? 1 : 0);
-    }
+    GPIO_PinWrite(MIXING_ENA_GPIO, MIXING_ENA_PIN, enable ? 1 : 0);
 }
+
 
 /*******************************************************************************
  * Keypad Functions
