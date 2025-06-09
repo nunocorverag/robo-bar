@@ -5,7 +5,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdarg.h>
-
 #include "task.h"
 #include "queue.h"
 #include "semphr.h"
@@ -20,6 +19,7 @@ extern TaskHandle_t xTaskHandleSystemInit;
 extern TaskHandle_t xTaskHandleLedTest;
 extern TaskHandle_t xTaskHandleServoTest;
 extern TaskHandle_t xTaskHandleSystemMonitor;
+extern TaskHandle_t xTaskHandleSensorRead;  // Nueva tarea agregada
 
 /* RTOS kernel objects */
 extern QueueHandle_t xQueueSystemMessages;
@@ -31,6 +31,7 @@ extern TimerHandle_t xTimerSystemHeartbeat;
 extern uint32_t g_led_blink_count;
 extern uint32_t g_servo_test_count;
 extern uint32_t g_heartbeat_count;
+extern uint32_t g_sensor_read_count;  // Nuevo contador agregado
 
 /* Funciones auxiliares accesibles fuera de freertos_tasks.c */
 void Debug_Printf(const char* format, ...);
@@ -41,6 +42,7 @@ void vTaskSystemInit(void *pvParameters);
 void vTaskLedTest(void *pvParameters);
 void vTaskServoTest(void *pvParameters);
 void vTaskSystemMonitor(void *pvParameters);
+void vTaskSensorRead(void *pvParameters);  // Nueva función de tarea
 
 /* Timer callback */
 void vTimerCallbackSystemHeartbeat(TimerHandle_t xTimer);

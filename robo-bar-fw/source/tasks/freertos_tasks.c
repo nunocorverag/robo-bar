@@ -7,6 +7,7 @@ TaskHandle_t xTaskHandleSystemInit = NULL;
 TaskHandle_t xTaskHandleLedTest = NULL;
 TaskHandle_t xTaskHandleServoTest = NULL;
 TaskHandle_t xTaskHandleSystemMonitor = NULL;
+TaskHandle_t xTaskHandleSensorRead = NULL;  // Nueva variable agregada
 
 QueueHandle_t xQueueSystemMessages = NULL;
 SemaphoreHandle_t xSemaphoreUART = NULL;
@@ -16,6 +17,7 @@ TimerHandle_t xTimerSystemHeartbeat = NULL;
 uint32_t g_led_blink_count = 0;
 uint32_t g_servo_test_count = 0;
 uint32_t g_heartbeat_count = 0;
+uint32_t g_sensor_read_count = 0;  // Nuevo contador agregado
 
 typedef struct {
     uint8_t type;
@@ -61,6 +63,65 @@ static void LED_Test_Sequence(void) {
 
     LED_SetColor(false, false, false);
     vTaskDelay(pdMS_TO_TICKS(500));
+}
+
+/* Función para leer un sensor individual */
+static bool Sensor_Read(uint8_t sensor_id) {
+    switch (sensor_id) {
+        case 1: return GPIO_ReadPinInput(SENSOR_1_GPIO, SENSOR_1_PIN);
+        case 2: return GPIO_ReadPinInput(SENSOR_2_GPIO, SENSOR_2_PIN);
+        case 3: return GPIO_ReadPinInput(SENSOR_3_GPIO, SENSOR_3_PIN);
+        case 4: return GPIO_ReadPinInput(SENSOR_4_GPIO, SENSOR_4_PIN);
+        default: return false;
+    }
+}
+
+/* NUEVA TAREA: Lectura de sensores cada 10 segundos */
+void vTaskSensorRead(void *pvParameters) {
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    bool sensor_values[4];
+    
+    Debug_Printf("Sensor Reading Task started\r\n");
+
+    while (1) {
+        // Leer todos los sensores
+        for (uint8_t i = 0; i < 4; i++) {
+            sensor_values[i] = Sensor_Read(i + 1);
+        }
+        
+        // Incrementar contador
+        g_sensor_read_count++;
+        
+        // Imprimir valores de sensores
+        Debug_Printf("=== SENSOR READING #%lu ===\r\n", g_sensor_read_count);
+        Debug_Printf("Sensor 1 (PORTC-1): %s\r\n", sensor_values[0] ? "HIGH" : "LOW");
+        Debug_Printf("Sensor 2 (PORTC-2): %s\r\n", sensor_values[1] ? "HIGH" : "LOW");
+        Debug_Printf("Sensor 3 (PORTC-3): %s\r\n", sensor_values[2] ? "HIGH" : "LOW");
+        Debug_Printf("Sensor 4 (PORTC-4): %s\r\n", sensor_values[3] ? "HIGH" : "LOW");
+        
+        // Mostrar patrón binario de sensores (útil para debug)
+        uint8_t sensor_pattern = 0;
+        for (uint8_t i = 0; i < 4; i++) {
+            if (sensor_values[i]) {
+                sensor_pattern |= (1 << i);
+            }
+        }
+        Debug_Printf("Binary Pattern: 0b%04b (0x%02X)\r\n", sensor_pattern, sensor_pattern);
+        
+        // Detectar cambios respecto a lectura anterior
+        static uint8_t previous_pattern = 0xFF; // Inicializar con valor inválido
+        if (previous_pattern != 0xFF && previous_pattern != sensor_pattern) {
+            Debug_Printf("*** SENSOR CHANGE DETECTED! ***\r\n");
+            Debug_Printf("Previous: 0b%04b -> Current: 0b%04b\r\n", 
+                        previous_pattern, sensor_pattern);
+        }
+        previous_pattern = sensor_pattern;
+        
+        Debug_Printf("==============================\r\n\r\n");
+
+        // Esperar 10 segundos antes de la siguiente lectura
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(10000));
+    }
 }
 
 /* Tarea: Inicialización del sistema */
@@ -171,6 +232,7 @@ void vTaskSystemMonitor(void *pvParameters) {
             Debug_Printf("Free Heap: %u bytes\r\n", xPortGetFreeHeapSize());
             Debug_Printf("LED Cycles: %lu\r\n", g_led_blink_count);
             Debug_Printf("Servo Cycles: %lu\r\n", g_servo_test_count);
+            Debug_Printf("Sensor Reads: %lu\r\n", g_sensor_read_count);
             Debug_Printf("Heartbeat: %lu\r\n", g_heartbeat_count);
 
             Debug_Printf("=====================\r\n\r\n");
@@ -217,6 +279,10 @@ void FREERTOS_StartTasks(void) {
     if (xResult != pdPASS) while (1);
 
     xResult = xTaskCreate(vTaskSystemMonitor, "SystemMonitor", 384, NULL, TASK_PRIORITY_SYSTEM_MONITOR, &xTaskHandleSystemMonitor);
+    if (xResult != pdPASS) while (1);
+
+    // NUEVA TAREA: Lectura de sensores
+    xResult = xTaskCreate(vTaskSensorRead, "SensorRead", 256, NULL, TASK_PRIORITY_LED_STATUS, &xTaskHandleSensorRead);
     if (xResult != pdPASS) while (1);
 
     if (xTimerStart(xTimerSystemHeartbeat, 0) != pdPASS) while (1);
