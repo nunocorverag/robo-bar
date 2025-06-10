@@ -142,13 +142,14 @@
  * CAMBIADO: De PORTE 24/25 a PORTC 10/11
  ******************************************************************************/
 /* I2C pins para LCD - Reasignados a PORTC 10/11 */
+/* SDA - PORTC11 AND SLC - PORTC10*/ 
 #define LCD_I2C_SDA_PORT    PORTC
 #define LCD_I2C_SDA_GPIO    GPIOC
-#define LCD_I2C_SDA_PIN     10U
+#define LCD_I2C_SDA_PIN     11U
 
 #define LCD_I2C_SCL_PORT    PORTC
 #define LCD_I2C_SCL_GPIO    GPIOC
-#define LCD_I2C_SCL_PIN     11U
+#define LCD_I2C_SCL_PIN     10U
 
 /*******************************************************************************
  * Additional Sensors (Optional)

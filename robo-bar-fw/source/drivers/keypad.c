@@ -1,24 +1,26 @@
 #include "MKL25Z4.h"
 #include "keypad.h"
 
-// PTC0–3 = columnas (inputs con pull-up), PTC4–7 = filas (outputs)
-
 void keypad_init(void) {
-    SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK;
-    SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK;
+    // Habilitar reloj para PORTB
+    SIM->SCGC5 |= SIM_SCGC5_PORTB_MASK;
 
-    PORTC->PCR[0] = PORT_PCR_MUX(1) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;
-    PORTC->PCR[1] = PORT_PCR_MUX(1) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;
-    PORTC->PCR[2] = PORT_PCR_MUX(1) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;
-    PORTC->PCR[3] = PORT_PCR_MUX(1) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;
+    // Configurar filas (PTB0-PTB3) como GPIO outputs
+    PORTB->PCR[0] = PORT_PCR_MUX(1); // PTB0 como GPIO
+    PORTB->PCR[1] = PORT_PCR_MUX(1); // PTB1
+    PORTB->PCR[2] = PORT_PCR_MUX(1); // PTB2
+    PORTB->PCR[3] = PORT_PCR_MUX(1); // PTB3
 
-    PORTC->PCR[4] = PORT_PCR_MUX(1);
-    PORTC->PCR[5] = PORT_PCR_MUX(1);
-    PORTC->PCR[6] = PORT_PCR_MUX(1);
-    PORTC->PCR[7] = PORT_PCR_MUX(1);
+    GPIOB->PDDR |= (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3);  // Set output
+    GPIOB->PDOR |= (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3);  // Inicialmente en alto
 
-    GPIOC->PDDR = (1 << 4)|(1 << 5)|(1 << 6)|(1 << 7);
-    GPIOC->PDOR = (1 << 4)|(1 << 5)|(1 << 6)|(1 << 7);
+    // Configurar columnas (PTB8-PTB11) como GPIO inputs con pull-up
+    PORTB->PCR[8] = PORT_PCR_MUX(1) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;  // Pull-up
+    PORTB->PCR[9] = PORT_PCR_MUX(1) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;
+    PORTB->PCR[10] = PORT_PCR_MUX(1) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;
+    PORTB->PCR[11] = PORT_PCR_MUX(1) | PORT_PCR_PE_MASK | PORT_PCR_PS_MASK;
+
+    GPIOB->PDDR &= ~((1 << 8) | (1 << 9) | (1 << 10) | (1 << 11)); // Inputs
 }
 
 char keypad_getkey(void) {
@@ -32,22 +34,24 @@ char keypad_getkey(void) {
     static char last_key = 0;
 
     for (int row = 0; row < 4; row++) {
-        GPIOC->PDOR = ~(1 << (row + 4));
-        for (volatile int d = 0; d < 1000; d++); // Debounce corto
+        // Poner la fila actual en bajo y las demás en alto
+        GPIOB->PDOR = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3); // Todas filas en alto
+        GPIOB->PDOR &= ~(1 << row); // fila actual en bajo
+
+        for (volatile int d = 0; d < 1000; d++); // debounce corto
 
         for (int col = 0; col < 4; col++) {
-            if (!(GPIOC->PDIR & (1 << col))) {
+            if (!(GPIOB->PDIR & (1 << (col + 8)))) { // columnas PTB8-11
                 char current_key = keys[row][col];
                 if (current_key != last_key) {
                     last_key = current_key;
-                    return current_key; // Se detecta una nueva tecla
+                    return current_key; // Nueva tecla detectada
                 }
-                return 0; // Ya fue detectada
+                return 0; // Ya fue detectada antes
             }
         }
-        GPIOC->PDOR = (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7);
     }
 
-    last_key = 0; // Si no se detectó nada, se reinicia el estado
+    last_key = 0; // No se detectó tecla
     return 0;
 }
