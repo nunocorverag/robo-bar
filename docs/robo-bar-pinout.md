@@ -59,8 +59,8 @@ Este documento lista todas las conexiones de pines usadas en el proyecto Robo-Ba
 
 | Signal      | MCU Port | Pin Number | Description        |
 |-------------|----------|------------|--------------------|
-| I2C SDA     | PORTC    | 10         | LCD I2C Data Line  |
-| I2C SCL     | PORTC    | 11         | LCD I2C Clock Line |
+| I2C SDA     | PORTC    | 11         | LCD I2C Data Line  |
+| I2C SCL     | PORTC    | 10         | LCD I2C Clock Line |
 
 ---
 
