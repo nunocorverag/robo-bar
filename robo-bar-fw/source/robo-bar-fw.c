@@ -145,12 +145,31 @@ int main(void)
         while(1);
     }
    
+    // todo: uncomment master task creation when ready
     // Crear la tarea maestra que maneja la secuencia
-    xResult = xTaskCreate(vTaskSequenceManager, "SequenceManager", 512, NULL,
-                         tskIDLE_PRIORITY + 1, NULL);
-    if (xResult != pdPASS) {
-        Debug_Printf("ERROR: Failed to create SequenceManager task\r\n");
+    // xResult = xTaskCreate(vTaskSequenceManager, "SequenceManager", 512, NULL,
+    //                      tskIDLE_PRIORITY + 1, NULL);
+    // if (xResult != pdPASS) {
+    //     Debug_Printf("ERROR: Failed to create SequenceManager task\r\n");
+    //     while(1);
+    // }
+
+    // HARDCODED for debugging purposes
+    // Inicializar el flujo de inicio sin tareas
+    Debug_Printf("\r\n\r\n=== Robo-Bar System Starting ===\r\n");
+    if (!StartupFlow_Init()) {
+        printf("ERROR: StartupFlow_Init failed\r\n");
+        LED_SetColor(true, false, false); // Rojo - Error
         while(1);
+    }
+
+    // Ejecutar directamente el flujo de inicio paso a paso
+    if (StartupFlow_Execute()) {
+        Debug_Printf("StartupFlow completed successfully\r\n");
+        LED_SetColor(false, true, false); // Verde - Listo
+    } else {
+        Debug_Printf("ERROR: StartupFlow failed\r\n");
+        LED_SetColor(true, false, false); // Rojo - Error
     }
    
     Debug_Printf("Starting FreeRTOS scheduler...\r\n");
