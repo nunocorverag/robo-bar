@@ -24,32 +24,9 @@ typedef struct {
     uint32_t data;
 } system_message_t;
 
-Debug_Printf(const char* format, ...) {
-    if (xSemaphoreUART != NULL) {
-        if (xSemaphoreTake(xSemaphoreUART, pdMS_TO_TICKS(100)) == pdTRUE) {
-            va_list args;
-            char buffer[256];
-
-            va_start(args, format);
-            vsnprintf(buffer, sizeof(buffer), format, args);
-            va_end(args);
-
-            for (int i = 0; buffer[i] != '\0'; i++) {
-                while (!(UART0->S1 & UART_S1_TDRE_MASK));
-                UART0->D = buffer[i];
-            }
-
-            xSemaphoreGive(xSemaphoreUART);
-        }
-    }
-}
 
 /* Funciones de control LED */
-LED_SetColor(bool red, bool green, bool blue) {
-    GPIO_WritePinOutput(LED_RED_GPIO, LED_RED_PIN, !red);
-    GPIO_WritePinOutput(LED_GREEN_GPIO, LED_GREEN_PIN, !green);
-    GPIO_WritePinOutput(LED_BLUE_GPIO, LED_BLUE_PIN, !blue);
-}
+
 
 static void LED_Test_Sequence(void) {
     LED_SetColor(true, false, false);

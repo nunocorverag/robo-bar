@@ -39,8 +39,13 @@ bool StartupFlow_Init(void) {
     g_startup_flow.previous_state = STARTUP_STATE_INIT;
     
     // Initialize LCD and Keypad (sin valor de retorno)
-    lcd_init(); 
+    Debug_Printf("Initializing LCD...\r\n");
+    lcd_init();
+    Debug_Printf("LCD Initialized.\r\n");
+
+    Debug_Printf("Initializing Keypad...\r\n");
     keypad_init();
+    Debug_Printf("Keypad Initialized.\r\n");
     
     Debug_Printf("StartupFlow: Initialization complete\r\n");
     return true;
@@ -171,7 +176,8 @@ void StartupFlow_Task(void *pvParameters) {
         
         // Signal other tasks that startup is complete
         if (xEventGroupSystem) {
-            xEventGroupSetBits(xEventGroupSystem, (1 << 1));  // Startup complete flag
+            xEventGroupSetBits(xEventGroupSystem, (1 << 1));  // Usar bit 1 para startup complete
+            Debug_Printf("StartupFlow: Startup complete signal sent\r\n");
         }
     } else {
         Debug_Printf("StartupFlow: Task failed\r\n");
@@ -179,9 +185,9 @@ void StartupFlow_Task(void *pvParameters) {
     }
     
     // Task complete, delete self
+    Debug_Printf("StartupFlow: Task ending\r\n");
     vTaskDelete(NULL);
 }
-
 /*******************************************************************************
  * Screen Display Functions
  ******************************************************************************/
