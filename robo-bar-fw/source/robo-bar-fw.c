@@ -15,78 +15,45 @@
 
 #include "tasks/freertos_tasks.h"
 #include "config/board_init.h"
+#include "core/startup_flow.h"
+
+static EventGroupHandle_t xEventGroup;
+
+#define STARTUP_COMPLETE_BIT (1 << 0)  // Bit para indicar que el flujo de arranque ha finalizado
 
 int main(void)
 {
-    /* Initialize hardware */
+    // Inicializar hardware (incluyendo UART)
     BOARD_InitAll();
     
-    /* Initial LED test to show system is alive */
-    LED_SetColor(true, true, true); /* White */
+    // Crear el grupo de eventos para la señalización de que el arranque ha finalizado
+    xEventGroup = xEventGroupCreate();
+
+    // Prueba inicial con LED para indicar que el sistema está vivo
+    LED_SetColor(true, true, true); // Blanco
 
     Debug_Printf("\r\n\r\nRobo-Bar System Starting...\r\n");
 
-    /* Crear todas las tareas, colas, semáforos y timer */
-    FREERTOS_StartTasks();
+    // Crear la tarea para el flujo de arranque (solo la tarea de flujo de arranque por ahora)
+    xTaskCreate(StartupFlow_Task, "StartupFlow", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
 
-    /* Print startup message */
-    const char startup_msg[] = "\r\n\r\n"
-        "========================================\r\n"
-        "    ROBO-BAR SYSTEM STARTING UP...     \r\n"
-        "========================================\r\n"
-        "Hardware: FRDM-KL25Z (ARM Cortex-M0+)\r\n"
-        "Firmware: v1.0.0\r\n"
-        "FreeRTOS: Enabled\r\n"
-        "Tasks Created: 4\r\n"
-        "Heap Available: ";
+    // Esperar a que el flujo de arranque haya terminado (esperando el evento de completado)
+    xEventGroupWaitBits(xEventGroup, STARTUP_COMPLETE_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
 
-    for (int i = 0; startup_msg[i] != '\0'; i++) {
-        while (!(UART0->S1 & UART_S1_TDRE_MASK));
-        UART0->D = startup_msg[i];
-    }
+    // Una vez que el flujo de arranque esté completo, enviar un mensaje por UART para indicar que el sistema está listo
+    Debug_Printf("Flujo de arranque completado, el sistema está listo para otras tareas.\r\n");
 
-    char heap_buffer[32];
-    snprintf(heap_buffer, sizeof(heap_buffer), "%u bytes\r\n", 
-             (unsigned int)configTOTAL_HEAP_SIZE);
-    for (int i = 0; heap_buffer[i] != '\0'; i++) {
-        while (!(UART0->S1 & UART_S1_TDRE_MASK));
-        UART0->D = heap_buffer[i];
-    }
+    // Ya podemos agregar tareas adicionales, pero por ahora no las agregamos.
 
-    const char startup_end[] = 
-        "========================================\r\n"
-        "Starting FreeRTOS Scheduler...\r\n\r\n";
+    // Iniciar el FreeRTOS scheduler
+    // vTaskStartScheduler();
 
-    for (int i = 0; startup_end[i] != '\0'; i++) {
-        while (!(UART0->S1 & UART_S1_TDRE_MASK));
-        UART0->D = startup_end[i];
-    }
-
-    LED_SetColor(false, true, false); /* Green - system ready */
-    for (volatile int i = 0; i < 1000000; i++);
-    LED_SetColor(false, false, false); /* Off */
-
-    /* Start the FreeRTOS scheduler */
-    vTaskStartScheduler();
-
-    /* If scheduler returns, something went wrong */
-    LED_SetColor(true, false, false); /* Red error indication */
-    g_last_error = SYSTEM_ERROR_UNKNOWN;
-
-    const char error_msg[] = "CRITICAL ERROR: FreeRTOS Scheduler Failed!\r\n";
-    for (int i = 0; error_msg[i] != '\0'; i++) {
-        while (!(UART0->S1 & UART_S1_TDRE_MASK));
-        UART0->D = error_msg[i];
-    }
-
-    while (1) {
-        LED_SetColor(true, false, false);   /* Red */
-        for (volatile int i = 0; i < 250000; i++);
-        LED_SetColor(false, false, false);  /* Off */
-        for (volatile int i = 0; i < 250000; i++);
-        LED_SetColor(true, false, false);   /* Red */
-        for (volatile int i = 0; i < 250000; i++);
-        LED_SetColor(false, false, false);  /* Off */
-        for (volatile int i = 0; i < 1000000; i++);
-    }
+    // // Si el scheduler no arranca correctamente, mostrar un mensaje de error
+    // LED_SetColor(true, false, false); // Rojo - Error
+    // while (1) {
+    //     LED_SetColor(true, false, false);   // Rojo
+    //     for (volatile int i = 0; i < 250000; i++);
+    //     LED_SetColor(false, false, false);  // Apagar
+    //     for (volatile int i = 0; i < 250000; i++);
+    // }
 }
