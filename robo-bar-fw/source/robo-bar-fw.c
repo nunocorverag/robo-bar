@@ -146,27 +146,11 @@ int main(void)
     }
    
     // Crear la tarea maestra que maneja la secuencia
-    // xResult = xTaskCreate(vTaskSequenceManager, "SequenceManager", 512, NULL,
-    //                      tskIDLE_PRIORITY + 1, NULL);
-    // if (xResult != pdPASS) {
-    //     Debug_Printf("ERROR: Failed to create SequenceManager task\r\n");
-    //     while(1);
-    // }
-
-    Debug_Printf("=== Starting Startup Flow ===\r\n");
-    if (!StartupFlow_Init()) {
-        Debug_Printf("StartupFlow: Initialization failed\r\n");
-        LED_SetColor(true, false, false); // Rojo - Error
-        return -1;  // Salir si falla la inicialización
-    }
-    
-    // Ejecutar el flujo de arranque (en lugar de crear una tarea)
-    if (StartupFlow_Execute()) {
-        Debug_Printf("StartupFlow: Task completed successfully\r\n");
-        LED_SetColor(false, true, false); // Verde - Listo
-    } else {
-        Debug_Printf("StartupFlow: Task failed\r\n");
-        LED_SetColor(true, false, false); // Rojo - Error
+    xResult = xTaskCreate(vTaskSequenceManager, "SequenceManager", 512, NULL,
+                         tskIDLE_PRIORITY + 1, NULL);
+    if (xResult != pdPASS) {
+        Debug_Printf("ERROR: Failed to create SequenceManager task\r\n");
+        while(1);
     }
    
     Debug_Printf("Starting FreeRTOS scheduler...\r\n");

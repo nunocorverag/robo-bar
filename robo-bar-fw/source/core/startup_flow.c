@@ -38,6 +38,11 @@ bool StartupFlow_Init(void) {
     g_startup_flow.current_state = STARTUP_STATE_INIT;
     g_startup_flow.previous_state = STARTUP_STATE_INIT;
     
+    // Initialize I2C
+    Debug_Printf("Initializing I2C...\r\n");
+    i2c_init();
+    Debug_Printf("I2C Initialized.\r\n");
+
     // Initialize LCD and Keypad (sin valor de retorno)
     Debug_Printf("Initializing LCD...\r\n");
     lcd_init();
