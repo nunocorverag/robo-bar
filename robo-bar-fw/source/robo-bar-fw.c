@@ -73,6 +73,10 @@ void SystemController_Run(void) {
                     g_system_state = SYSTEM_STATE_SENSOR_CHECK;
                     LED_SetColor(false, true, false); // Verde
                     Delay(1000);
+                    
+                    // RESTART: Preparar el siguiente flujo
+                    SensorCheckFlow_Restart();
+                    op_status = OP_IN_PROGRESS; // Reset op_status
                 }
                 else if (op_status == OP_ERROR) {
                     Debug_Printf("ERROR: Startup failed!\r\n");
@@ -82,6 +86,9 @@ void SystemController_Run(void) {
             }
             else {
                 g_system_state = SYSTEM_STATE_SENSOR_CHECK;
+                // RESTART: Preparar el flujo de sensores
+                SensorCheckFlow_Restart();
+                op_status = OP_IN_PROGRESS; // Reset op_status
             }
             break;
 
@@ -89,13 +96,17 @@ void SystemController_Run(void) {
             Debug_Printf("System: Checking sensors...\r\n");
             LED_SetColor(false, false, true); // Azul - Verificando sensores
             
-            op_status = SensorCheckFlow_Execute();
+            op_status = SensorCheckFlow_Run();
             
             if (op_status == OP_COMPLETED) {
                 Debug_Printf("System: Sensors OK\r\n");
                 g_system_state = SYSTEM_STATE_BEVERAGE_SELECTION;
                 LED_SetColor(false, true, false); // Verde
                 Delay(500);
+                
+                // RESTART: Preparar el siguiente flujo
+                BeverageSelectFlow_Restart();
+                op_status = OP_IN_PROGRESS; // Reset op_status
             }
             else if (op_status == OP_ERROR) {
                 Debug_Printf("ERROR: Sensor check failed!\r\n");
@@ -108,12 +119,15 @@ void SystemController_Run(void) {
             Debug_Printf("System: Ready for beverage selection\r\n");
             LED_SetColor(true, false, true); // Magenta - Selección
             
-            op_status = BeverageSelectFlow_Execute();
+            op_status = BeverageSelectFlow_Run();
             
             if (op_status == OP_COMPLETED) {
                 Debug_Printf("System: Beverage prepared!\r\n");
                 g_system_state = SYSTEM_STATE_WAITING_RESTART;
                 LED_SetColor(false, true, false); // Verde
+                
+                // RESTART: Reset op_status para el próximo ciclo
+                op_status = OP_IN_PROGRESS;
             }
             else if (op_status == OP_ERROR) {
                 Debug_Printf("ERROR: Beverage selection failed!\r\n");
@@ -125,16 +139,27 @@ void SystemController_Run(void) {
         case SYSTEM_STATE_WAITING_RESTART:
             Debug_Printf("System: Cycle completed. Restarting in 3 seconds...\r\n");
             LED_SetColor(false, true, false); // Verde
-            Delay(3000);
+            Delay(1000);
             g_system_state = SYSTEM_STATE_SENSOR_CHECK;
+            
+            // RESTART: Preparar el flujo de sensores para el nuevo ciclo
+            SensorCheckFlow_Restart();
+            op_status = OP_IN_PROGRESS; // Reset op_status
             break;
 
         case SYSTEM_STATE_ERROR:
             Debug_Printf("System: Critical error! Attempting recovery in 5 seconds...\r\n");
             LED_SetColor(true, false, false); // Rojo
             Delay(5000);
-            // Intentar recuperación reiniciando el flujo
+            
+            // RESTART: Intentar recuperación reiniciando todos los flujos
+            StartupFlow_Restart();
+            SensorCheckFlow_Restart();
+            BeverageSelectFlow_Restart();
+            
+            // Reiniciar desde el chequeo de sensores
             g_system_state = SYSTEM_STATE_SENSOR_CHECK;
+            op_status = OP_IN_PROGRESS; // Reset op_status
             break;
     }
 }

@@ -11,10 +11,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../config/system_config.h"
+#include "../shared/system_types.h"
 
 /*******************************************************************************
  * Sensor Check Flow States
  ******************************************************************************/
+
 typedef enum {
     SENSOR_CHECK_STATE_INIT = 0,
     SENSOR_CHECK_STATE_CHECKING_SENSORS,
@@ -31,6 +33,7 @@ typedef enum {
 /*******************************************************************************
  * Operation Modes
  ******************************************************************************/
+
 typedef enum {
     OPERATION_MODE_NORMAL = 1,
     OPERATION_MODE_REFILL = 2
@@ -39,6 +42,7 @@ typedef enum {
 /*******************************************************************************
  * Sensor Status Structure
  ******************************************************************************/
+
 typedef struct {
     bool sensor_1_ok;      /* Liquid 1 level OK */
     bool sensor_2_ok;      /* Liquid 2 level OK */
@@ -53,13 +57,9 @@ typedef struct {
  ******************************************************************************/
 typedef struct {
     sensor_check_flow_state_t current_state;
-    sensor_check_flow_state_t previous_state;
     operation_mode_t selected_mode;
     sensor_status_t sensor_status;
-    uint32_t state_enter_time;
-    uint32_t total_check_time;
-    bool check_complete;
-    bool error_occurred;
+    bool hardware_initialized;  // Agregado para compatibilidad con startup_flow
 } sensor_check_flow_t;
 
 /*******************************************************************************
@@ -67,10 +67,10 @@ typedef struct {
  ******************************************************************************/
 
 /**
- * @brief Run sensor check flow controller
- * @return void
+ * @brief Run sensor check flow controller (similar a StartupFlow_Run)
+ * @return operation_status_t - OP_IN_PROGRESS, OP_COMPLETED, or OP_ERROR
  */
-void SensorCheckFlow_Run(void);
+operation_status_t SensorCheckFlow_Run(void);
 
 /**
  * @brief Initialize sensor check flow controller
@@ -79,11 +79,18 @@ void SensorCheckFlow_Run(void);
 bool SensorCheckFlow_Init(void);
 
 /**
- * @brief Execute main sensor check flow (blocking)
- * This function will run the complete sensor check and mode selection sequence
- * @return true if check successful, false if error
+ * @brief Execute one step of sensor check flow (similar a StartupFlow_Execute)
+ * @return operation_status_t - OP_IN_PROGRESS, OP_COMPLETED, or OP_ERROR
  */
-bool SensorCheckFlow_Execute(void);
+operation_status_t SensorCheckFlow_Execute(void);
+
+// Funciones de verificación y pantalla
+bool SensorCheckFlow_CheckSensors(void);
+void SensorCheckFlow_ShowSensorError(const sensor_status_t* sensor_status);
+operation_mode_t SensorCheckFlow_SelectMode(void);
+void SensorCheckFlow_ShowRefillInstructions(void);
+void SensorCheckFlow_ShowReadyScreen(void);
+void SensorCheckFlow_ShowError(const char* error_msg);
 
 /**
  * @brief Get current sensor check flow state
@@ -108,11 +115,6 @@ bool SensorCheckFlow_IsComplete(void);
  * @return Pointer to sensor status structure
  */
 const sensor_status_t* SensorCheckFlow_GetSensorStatus(void);
-
-/**
- * @brief Force restart of sensor check flow
- */
-void SensorCheckFlow_Restart(void);
 
 /*******************************************************************************
  * Internal Functions (can be used for testing)
@@ -158,5 +160,10 @@ void SensorCheckFlow_ShowError(const char* error_msg);
  * @return String representation of state
  */
 const char* SensorCheckFlow_StateToString(sensor_check_flow_state_t state);
+
+/**
+ * @brief Reinicia el flujo de verificación de sensores a su estado inicial
+ */
+void SensorCheckFlow_Restart(void);
 
 #endif /* SENSOR_CHECK_FLOW_H */

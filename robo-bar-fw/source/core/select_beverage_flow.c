@@ -14,6 +14,13 @@
 #include <stdio.h>
 
 /*******************************************************************************
+ * External Functions
+ ******************************************************************************/
+extern void Debug_Printf(const char* format, ...);
+extern void LED_SetColor(bool red, bool green, bool blue);
+extern void Delay(uint32_t ms);
+
+/*******************************************************************************
  * Private Variables
  ******************************************************************************/
 static beverage_select_flow_t g_beverage_select_flow;
@@ -29,126 +36,123 @@ static const receta_bebida_t recetas[] = {
 #define NUM_BEBIDAS (sizeof(recetas)/sizeof(recetas[0]))
 
 /*******************************************************************************
- * Private Function Prototypes
- ******************************************************************************/
-static void delay_ms(uint32_t ms);
-
-/*******************************************************************************
  * Public Functions
  ******************************************************************************/
 
-void BeverageSelectFlow_Run(void) {
-    if (!BeverageSelectFlow_Init()) {
-        Debug_Printf("BeverageSelectFlow: Initialization failed\r\n");
-        LED_SetColor(true, false, false);  // Red error
-        return;
+operation_status_t BeverageSelectFlow_Run(void) {
+    // Inicializar si no se ha hecho ya
+    if (!g_beverage_select_flow.flow_initialized) {
+        if (!BeverageSelectFlow_Init()) {
+            BeverageSelectFlow_ShowError("Init falló");
+            LED_SetColor(true, false, false);  // LED rojo
+            return OP_ERROR;
+        }
     }
 
-    if (BeverageSelectFlow_Execute()) {
-        Debug_Printf("BeverageSelectFlow: Completed successfully\r\n");
-        LED_SetColor(false, true, false);  // Green success
-    } else {
-        Debug_Printf("BeverageSelectFlow: Execution failed\r\n");
-        LED_SetColor(true, false, false);  // Red error
+    // Controlar el estado de la operación
+    operation_status_t result = OP_IN_PROGRESS;
+
+    // Ejecutar el flujo de selección de bebida paso a paso
+    while (result == OP_IN_PROGRESS) {
+        result = BeverageSelectFlow_Execute();  // Ejecuta paso por paso
+
+        if (result == OP_ERROR) {
+            BeverageSelectFlow_ShowError("Error ejecución");
+            LED_SetColor(true, false, false);  // LED rojo
+            Debug_Printf("BeverageSelectFlow: Failed with error\r\n");
+            break;
+        }
     }
+
+    // Si completamos correctamente
+    if (result == OP_COMPLETED) {
+        LED_SetColor(false, true, false);  // LED verde
+        Debug_Printf("BeverageSelectFlow: Completed successfully\r\n");
+    }
+
+    return result;
 }
 
-/**
- * @brief Initialize beverage selection flow controller
- * @return true if successful, false otherwise
- */
 bool BeverageSelectFlow_Init(void) {
     Debug_Printf("BeverageSelectFlow: Initializing...\r\n");
     
     // Initialize structure
     memset(&g_beverage_select_flow, 0, sizeof(beverage_select_flow_t));
     g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_INIT;
-    g_beverage_select_flow.previous_state = BEVERAGE_SELECT_STATE_INIT;
+    g_beverage_select_flow.flow_initialized = false;
     
     // Initialize servo control
     servo_control_init();
     
+    g_beverage_select_flow.flow_initialized = true;
     Debug_Printf("BeverageSelectFlow: Initialization complete\r\n");
     return true;
 }
 
-/**
- * @brief Execute main beverage selection and dispensing flow (blocking)
- * This function will run the complete beverage selection and dispensing sequence
- * @return true if flow successful, false if error
- */
-bool BeverageSelectFlow_Execute(void) {
-    Debug_Printf("BeverageSelectFlow: Starting execution\r\n");
-    
-    
-    while (!g_beverage_select_flow.flow_complete && !g_beverage_select_flow.error_occurred) {
-        
-        // Update state entry time on state change
-        if (g_beverage_select_flow.current_state != g_beverage_select_flow.previous_state) {
-            g_beverage_select_flow.previous_state = g_beverage_select_flow.current_state;
-            Debug_Printf("BeverageSelectFlow: State changed to %s\r\n", BeverageSelectFlow_StateToString(g_beverage_select_flow.current_state));
-        }
-        
-        switch (g_beverage_select_flow.current_state) {
-            case BEVERAGE_SELECT_STATE_INIT:
-                g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_SELECTION;
-                break;
+operation_status_t BeverageSelectFlow_Execute(void) {
+    switch (g_beverage_select_flow.current_state) {
+        case BEVERAGE_SELECT_STATE_INIT:
+            Debug_Printf("BeverageSelectFlow: Starting beverage selection...\r\n");
+            g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_SELECTION;
+            break;
+            
+        case BEVERAGE_SELECT_STATE_SELECTION:
+            Debug_Printf("BeverageSelectFlow: Waiting for beverage selection...\r\n");
+            g_beverage_select_flow.selected_beverage = BeverageSelectFlow_SelectBeverage();
+            
+            if (g_beverage_select_flow.selected_beverage >= BEVERAGE_MOJITO && 
+                g_beverage_select_flow.selected_beverage <= BEVERAGE_VODKA_TONIC) {
                 
-            case BEVERAGE_SELECT_STATE_SELECTION:
-                g_beverage_select_flow.selected_beverage = BeverageSelectFlow_SelectBeverage();
-                if (g_beverage_select_flow.selected_beverage >= BEVERAGE_MOJITO && 
-                    g_beverage_select_flow.selected_beverage <= BEVERAGE_VODKA_TONIC) {
-                    
-                    // Get recipe for selected beverage
-                    g_beverage_select_flow.current_recipe = BeverageSelectFlow_GetRecipe(g_beverage_select_flow.selected_beverage);
-                    if (g_beverage_select_flow.current_recipe != NULL) {
-                        g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_DISPENSING;
-                    } else {
-                        g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_ERROR;
-                    }
+                // Get recipe for selected beverage
+                g_beverage_select_flow.current_recipe = BeverageSelectFlow_GetRecipe(g_beverage_select_flow.selected_beverage);
+                if (g_beverage_select_flow.current_recipe != NULL) {
+                    Debug_Printf("BeverageSelectFlow: Selected %s\r\n", g_beverage_select_flow.current_recipe->nombre);
+                    g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_DISPENSING;
                 } else {
-                    // Invalid selection, stay in selection state
-                    continue;
-                }
-                break;
-                
-            case BEVERAGE_SELECT_STATE_DISPENSING:
-                BeverageSelectFlow_ShowDispensingScreen(g_beverage_select_flow.current_recipe->nombre);
-                
-                if (BeverageSelectFlow_DispenseBeverage(g_beverage_select_flow.current_recipe)) {
-                    g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_DISPENSING_COMPLETE;
-                } else {
+                    Debug_Printf("BeverageSelectFlow: Failed to get recipe\r\n");
                     g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_ERROR;
                 }
-                break;
-                
-            case BEVERAGE_SELECT_STATE_DISPENSING_COMPLETE:
-                BeverageSelectFlow_ShowCompletionScreen(g_beverage_select_flow.current_recipe->nombre);
-                delay_ms(2000);  // Show completion message for 2 seconds
-                g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_COMPLETE;
-                break;
-                
-            case BEVERAGE_SELECT_STATE_COMPLETE:
-                g_beverage_select_flow.flow_complete = true;
-                break;
-                
-            case BEVERAGE_SELECT_STATE_ERROR:
-            default:
-                g_beverage_select_flow.error_occurred = true;
-                break;
-        }
-        
-        // Small delay to prevent tight loop
-        delay_ms(10);
+            } else {
+                Debug_Printf("BeverageSelectFlow: Invalid beverage selection\r\n");
+                g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_ERROR;
+            }
+            break;
+            
+        case BEVERAGE_SELECT_STATE_DISPENSING:
+            Debug_Printf("BeverageSelectFlow: Starting dispensing process...\r\n");
+            BeverageSelectFlow_ShowDispensingScreen(g_beverage_select_flow.current_recipe->nombre);
+            
+            if (BeverageSelectFlow_DispenseBeverage(g_beverage_select_flow.current_recipe)) {
+                g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_DISPENSING_COMPLETE;
+            } else {
+                Debug_Printf("BeverageSelectFlow: Dispensing failed\r\n");
+                g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_ERROR;
+            }
+            break;
+            
+        case BEVERAGE_SELECT_STATE_DISPENSING_COMPLETE:
+            Debug_Printf("BeverageSelectFlow: Dispensing completed\r\n");
+            BeverageSelectFlow_ShowCompletionScreen(g_beverage_select_flow.current_recipe->nombre);
+            Delay(2000);  // Show completion message for 2 seconds
+            g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_COMPLETE;
+            break;
+            
+        case BEVERAGE_SELECT_STATE_COMPLETE:
+            Debug_Printf("BeverageSelectFlow: Flow completed successfully\r\n");
+            return OP_COMPLETED;
+            
+        case BEVERAGE_SELECT_STATE_ERROR:
+            Debug_Printf("BeverageSelectFlow: Error state\r\n");
+            BeverageSelectFlow_ShowError("Proceso fallido");
+            return OP_ERROR;
+            
+        default:
+            Debug_Printf("BeverageSelectFlow: Unknown state\r\n");
+            g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_ERROR;
+            return OP_ERROR;
     }
-        
-    if (g_beverage_select_flow.flow_complete) {
-        Debug_Printf("BeverageSelectFlow: Completed successfully in %lu ms\r\n", g_beverage_select_flow.total_flow_time);
-        return true;
-    } else {
-        Debug_Printf("BeverageSelectFlow: Failed with error\r\n");
-        return false;
-    }
+    
+    return OP_IN_PROGRESS;
 }
 
 /*******************************************************************************
@@ -156,6 +160,11 @@ bool BeverageSelectFlow_Execute(void) {
  ******************************************************************************/
 
 beverage_type_t BeverageSelectFlow_SelectBeverage(void) {
+    if (!lcd_is_initialized()) {
+        Debug_Printf("BeverageSelectFlow: LCD not initialized, cannot show selection screen\r\n");
+        return BEVERAGE_MOJITO;  // Fallback
+    }
+    
     lcd_clear();
     lcd_set_cursor(0, 0);
     lcd_print("Selecciona 1-4:");
@@ -196,7 +205,7 @@ bool BeverageSelectFlow_DispenseBeverage(const receta_bebida_t* recipe) {
     }
     
     // Esperar el tiempo especificado para dispensar
-    delay_ms(recipe->tiempo_ms);
+    Delay(recipe->tiempo_ms);
     
     // Cerrar todas las válvulas
     for (int i = 0; i < 4; i++) {
@@ -211,6 +220,11 @@ bool BeverageSelectFlow_DispenseBeverage(const receta_bebida_t* recipe) {
 }
 
 void BeverageSelectFlow_ShowDispensingScreen(const char* beverage_name) {
+    if (!lcd_is_initialized()) {
+        Debug_Printf("BeverageSelectFlow: LCD not initialized for dispensing screen\r\n");
+        return;
+    }
+    
     lcd_clear();
     lcd_set_cursor(0, 0);
     lcd_print("Dispensando");
@@ -221,6 +235,11 @@ void BeverageSelectFlow_ShowDispensingScreen(const char* beverage_name) {
 }
 
 void BeverageSelectFlow_ShowCompletionScreen(const char* beverage_name) {
+    if (!lcd_is_initialized()) {
+        Debug_Printf("BeverageSelectFlow: LCD not initialized for completion screen\r\n");
+        return;
+    }
+    
     lcd_clear();
     lcd_set_cursor(0, 0);
     lcd_print("Bebida lista!");
@@ -231,44 +250,34 @@ void BeverageSelectFlow_ShowCompletionScreen(const char* beverage_name) {
 }
 
 void BeverageSelectFlow_ShowError(const char* error_msg) {
+    Debug_Printf("BeverageSelectFlow: Showing error: %s\r\n", error_msg);
+    
+    if (!lcd_is_initialized()) {
+        Debug_Printf("BeverageSelectFlow: LCD not initialized for error display\r\n");
+        return;
+    }
+    
     lcd_clear();
     lcd_set_cursor(0, 0);
     lcd_print("ERROR:");
-    lcd_set_cursor(1, 0);
-    lcd_print(error_msg);
-
-    Debug_Printf("BeverageSelectFlow: Error displayed: %s\r\n", error_msg);
-
+    
+    if (error_msg) {
+        lcd_set_cursor(1, 0);
+        lcd_print(error_msg);
+    }
+    
     // Flash red LED
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 5; i++) {
         LED_SetColor(true, false, false);   // Red
-        delay_ms(200);
+        Delay(200);
         LED_SetColor(false, false, false);  // Off
-        delay_ms(200);
+        Delay(200);
     }
 }
 
 /*******************************************************************************
- * Getter Functions
+ * Helper Functions
  ******************************************************************************/
-
-beverage_select_flow_state_t BeverageSelectFlow_GetState(void) {
-    return g_beverage_select_flow.current_state;
-}
-
-beverage_type_t BeverageSelectFlow_GetSelectedBeverage(void) {
-    return g_beverage_select_flow.selected_beverage;
-}
-
-bool BeverageSelectFlow_IsComplete(void) {
-    return g_beverage_select_flow.flow_complete;
-}
-
-void BeverageSelectFlow_Restart(void) {
-    Debug_Printf("BeverageSelectFlow: Restarting...\r\n");
-    memset(&g_beverage_select_flow, 0, sizeof(beverage_select_flow_t));
-    g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_INIT;
-}
 
 const char* BeverageSelectFlow_StateToString(beverage_select_flow_state_t state) {
     switch (state) {
@@ -276,8 +285,8 @@ const char* BeverageSelectFlow_StateToString(beverage_select_flow_state_t state)
         case BEVERAGE_SELECT_STATE_SELECTION: return "SELECTION";
         case BEVERAGE_SELECT_STATE_DISPENSING: return "DISPENSING";
         case BEVERAGE_SELECT_STATE_DISPENSING_COMPLETE: return "DISPENSING_COMPLETE";
-        case BEVERAGE_SELECT_STATE_ERROR: return "ERROR";
         case BEVERAGE_SELECT_STATE_COMPLETE: return "COMPLETE";
+        case BEVERAGE_SELECT_STATE_ERROR: return "ERROR";
         default: return "UNKNOWN";
     }
 }
@@ -289,15 +298,11 @@ const receta_bebida_t* BeverageSelectFlow_GetRecipe(beverage_type_t beverage_typ
     return NULL;
 }
 
-/*******************************************************************************
- * Private Helper Functions
- ******************************************************************************/
-
-void delay_ms(uint32_t ms) {
-    uint32_t ticks_per_ms = CLOCK_GetFreq(kCLOCK_CoreSysClk) / 1000;
-    for (uint32_t i = 0; i < ms; i++) {
-        for (volatile uint32_t j = 0; j < ticks_per_ms; j++) {
-            __NOP();  // No operation, solo para esperar
-        }
-    }
+void BeverageSelectFlow_Restart(void) {
+    Debug_Printf("BeverageSelectFlow: Restarting flow...\r\n");
+    
+    memset(&g_beverage_select_flow, 0, sizeof(beverage_select_flow_t));
+    g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_INIT;
+    
+    Debug_Printf("BeverageSelectFlow: Flow restarted\r\n");
 }

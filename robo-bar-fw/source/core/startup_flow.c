@@ -190,3 +190,17 @@ const char* StartupFlow_StateToString(startup_flow_state_t state) {
         default: return "UNKNOWN";
     }
 }
+
+void StartupFlow_Restart(void) {
+    Debug_Printf("StartupFlow: Restarting flow...\r\n");
+    
+    // Reset solo el estado, pero mantener hardware_initialized = true
+    // para evitar reinicializar el hardware innecesariamente
+    bool hw_init_status = g_startup_flow.hardware_initialized;
+    
+    memset(&g_startup_flow, 0, sizeof(startup_flow_t));
+    g_startup_flow.current_state = STARTUP_STATE_INIT;
+    g_startup_flow.hardware_initialized = hw_init_status;
+    
+    Debug_Printf("StartupFlow: Flow restarted\r\n");
+}

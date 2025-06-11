@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../config/system_config.h"
+#include "../shared/system_types.h"
 
 /*******************************************************************************
  * Beverage Selection Flow States
@@ -20,8 +21,8 @@ typedef enum {
     BEVERAGE_SELECT_STATE_SELECTION,
     BEVERAGE_SELECT_STATE_DISPENSING,
     BEVERAGE_SELECT_STATE_DISPENSING_COMPLETE,
-    BEVERAGE_SELECT_STATE_ERROR,
-    BEVERAGE_SELECT_STATE_COMPLETE
+    BEVERAGE_SELECT_STATE_COMPLETE,
+    BEVERAGE_SELECT_STATE_ERROR
 } beverage_select_flow_state_t;
 
 /*******************************************************************************
@@ -48,19 +49,20 @@ typedef struct {
  ******************************************************************************/
 typedef struct {
     beverage_select_flow_state_t current_state;
-    beverage_select_flow_state_t previous_state;
     beverage_type_t selected_beverage;
     const receta_bebida_t* current_recipe;
-    uint32_t state_enter_time;
-    uint32_t total_flow_time;
-    uint32_t dispensing_start_time;
-    bool flow_complete;
-    bool error_occurred;
+    bool flow_initialized;
 } beverage_select_flow_t;
 
 /*******************************************************************************
  * Function Prototypes
  ******************************************************************************/
+
+/**
+ * @brief Run the beverage selection flow - Main entry point
+ * @return Operation status (OP_COMPLETED, OP_ERROR, OP_IN_PROGRESS)
+ */
+operation_status_t BeverageSelectFlow_Run(void);
 
 /**
  * @brief Initialize beverage selection flow controller
@@ -69,43 +71,13 @@ typedef struct {
 bool BeverageSelectFlow_Init(void);
 
 /**
- * @brief Execute main beverage selection and dispensing flow (blocking)
- * This function will run the complete beverage selection and dispensing sequence
- * @return true if flow successful, false if error
+ * @brief Execute beverage selection flow step by step
+ * @return Operation status (OP_COMPLETED, OP_ERROR, OP_IN_PROGRESS)
  */
-bool BeverageSelectFlow_Execute(void);
-
-/**
- * @brief Run the entire beverage selection and dispensing process
- * This is the main function to start the beverage flow process
- */
-void BeverageSelectFlow_Run(void);
-
-/**
- * @brief Get current beverage selection flow state
- * @return Current state
- */
-beverage_select_flow_state_t BeverageSelectFlow_GetState(void);
-
-/**
- * @brief Get selected beverage type
- * @return Selected beverage type
- */
-beverage_type_t BeverageSelectFlow_GetSelectedBeverage(void);
-
-/**
- * @brief Check if beverage selection flow is complete
- * @return true if flow complete, false otherwise
- */
-bool BeverageSelectFlow_IsComplete(void);
-
-/**
- * @brief Force restart of beverage selection flow
- */
-void BeverageSelectFlow_Restart(void);
+operation_status_t BeverageSelectFlow_Execute(void);
 
 /*******************************************************************************
- * Internal Functions (can be used for testing)
+ * Screen Display Functions
  ******************************************************************************/
 
 /**
@@ -139,6 +111,10 @@ void BeverageSelectFlow_ShowCompletionScreen(const char* beverage_name);
  */
 void BeverageSelectFlow_ShowError(const char* error_msg);
 
+/*******************************************************************************
+ * Helper Functions
+ ******************************************************************************/
+
 /**
  * @brief Convert beverage selection state to string
  * @param state Beverage selection state
@@ -152,5 +128,10 @@ const char* BeverageSelectFlow_StateToString(beverage_select_flow_state_t state)
  * @return Pointer to recipe, or NULL if invalid type
  */
 const receta_bebida_t* BeverageSelectFlow_GetRecipe(beverage_type_t beverage_type);
+
+/**
+ * @brief Reinicia el flujo de selección de bebidas a su estado inicial
+ */
+void BeverageSelectFlow_Restart(void);
 
 #endif /* SELECT_BEVERAGE_FLOW_H */

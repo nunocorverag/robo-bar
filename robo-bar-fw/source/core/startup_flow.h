@@ -33,5 +33,6 @@ operation_status_t StartupFlow_Execute(void);  // Cambiado el tipo de retorno
 void StartupFlow_ShowInitScreen(void);
 void StartupFlow_ShowError(const char* error_msg);
 const char* StartupFlow_StateToString(startup_flow_state_t state);
+void StartupFlow_Restart(void);
 
 #endif /* STARTUP_FLOW_H */
