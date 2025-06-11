@@ -31,27 +31,23 @@ char keypad_getkey(void) {
         {'*', '0', '#', 'D'}
     };
 
-    static char last_key = 0;
-
     for (int row = 0; row < 4; row++) {
-        // Poner la fila actual en bajo y las demás en alto
-        GPIOB->PDOR = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3); // Todas filas en alto
-        GPIOB->PDOR &= ~(1 << row); // fila actual en bajo
+        // Poner todas las filas en alto
+        GPIOB->PDOR |= 0x0F;
 
-        for (volatile int d = 0; d < 1000; d++); // debounce corto
+        // Poner fila actual en bajo
+        GPIOB->PDOR &= ~(1 << row);
+
+        for (volatile int d = 0; d < 1000; d++); // debounce simple
 
         for (int col = 0; col < 4; col++) {
-            if (!(GPIOB->PDIR & (1 << (col + 8)))) { // columnas PTB8-11
-                char current_key = keys[row][col];
-                if (current_key != last_key) {
-                    last_key = current_key;
-                    return current_key; // Nueva tecla detectada
-                }
-                return 0; // Ya fue detectada antes
+            if (!(GPIOB->PDIR & (1 << (col + 8)))) {
+                // Esperar a que se suelte
+                while (!(GPIOB->PDIR & (1 << (col + 8))));
+                return keys[row][col];
             }
         }
     }
 
-    last_key = 0; // No se detectó tecla
-    return 0;
+    return 0; // Ninguna tecla presionada
 }
