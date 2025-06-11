@@ -5,6 +5,7 @@
 #include "tasks/freertos_tasks.h"
 #include "config/board_init.h"
 #include "core/startup_flow.h"
+#include "core/select_beverage_flow.h"
 
 // Variables globales necesarias (ya declaradas en freertos_tasks.h)
 extern SemaphoreHandle_t xSemaphoreUART;
@@ -49,28 +50,13 @@ void vTaskSequenceManager(void *pvParameters)
         // Paso 2: Crear las tareas adicionales
         
         // Tarea de monitoreo del sistema
-        xResult = xTaskCreate(vTaskSystemMonitor, "SystemMonitor", 384, NULL,
-                            TASK_PRIORITY_SYSTEM_MONITOR, &xTaskHandleSystemMonitor);
-        if (xResult != pdPASS) {
-            Debug_Printf("ERROR: Failed to create SystemMonitor task\r\n");
+        BaseType_t result = xTaskCreate(vTaskBeverageFlow, "BeverageFlow", 512, NULL, tskIDLE_PRIORITY + 2, NULL);
+        if (result != pdPASS) {
+            Debug_Printf("ERROR: Failed to create BeverageFlow task\r\n");
+            LED_SetColor(true, false, false); // Rojo - Error
         } else {
-            Debug_Printf("SystemMonitor task created\r\n");
+            Debug_Printf("BeverageFlow task created successfully\r\n");
         }
-       
-        // Tarea de lectura de sensores
-        xResult = xTaskCreate(vTaskSensorRead, "SensorRead", 256, NULL,
-                            TASK_PRIORITY_LED_STATUS, &xTaskHandleSensorRead);
-        if (xResult != pdPASS) {
-            Debug_Printf("ERROR: Failed to create SensorRead task\r\n");
-        } else {
-            Debug_Printf("SensorRead task created\r\n");
-        }
-       
-        Debug_Printf("Additional tasks created and running\r\n");
-        Debug_Printf("=== System Ready for Operation ===\r\n");
-        
-        // Indicar que el sistema está listo con LED verde
-        LED_SetColor(false, true, false); // Verde - Listo
         
     } else {
         Debug_Printf("ERROR: Startup Flow failed to complete (timeout)!\r\n");
@@ -147,29 +133,11 @@ int main(void)
    
     // todo: uncomment master task creation when ready
     // Crear la tarea maestra que maneja la secuencia
-    // xResult = xTaskCreate(vTaskSequenceManager, "SequenceManager", 512, NULL,
-    //                      tskIDLE_PRIORITY + 1, NULL);
-    // if (xResult != pdPASS) {
-    //     Debug_Printf("ERROR: Failed to create SequenceManager task\r\n");
-    //     while(1);
-    // }
-
-    // HARDCODED for debugging purposes
-    // Inicializar el flujo de inicio sin tareas
-    Debug_Printf("\r\n\r\n=== Robo-Bar System Starting ===\r\n");
-    if (!StartupFlow_Init()) {
-        printf("ERROR: StartupFlow_Init failed\r\n");
-        LED_SetColor(true, false, false); // Rojo - Error
+    xResult = xTaskCreate(vTaskSequenceManager, "SequenceManager", 512, NULL,
+                         tskIDLE_PRIORITY + 1, NULL);
+    if (xResult != pdPASS) {
+        Debug_Printf("ERROR: Failed to create SequenceManager task\r\n");
         while(1);
-    }
-
-    // Ejecutar directamente el flujo de inicio paso a paso
-    if (StartupFlow_Execute()) {
-        Debug_Printf("StartupFlow completed successfully\r\n");
-        LED_SetColor(false, true, false); // Verde - Listo
-    } else {
-        Debug_Printf("ERROR: StartupFlow failed\r\n");
-        LED_SetColor(true, false, false); // Rojo - Error
     }
    
     Debug_Printf("Starting FreeRTOS scheduler...\r\n");
