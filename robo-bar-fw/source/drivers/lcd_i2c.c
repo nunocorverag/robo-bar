@@ -1,7 +1,5 @@
 #include "MKL25Z4.h"
 #include "lcd_i2c.h"
-#include "FreeRTOS.h"
-#include "task.h"
 
 // Pines I2C: PTC10 = SDA, PTC11 = SCL
 #define I2C_TRAN        I2C1->C1 |= I2C_C1_TX_MASK
@@ -26,29 +24,29 @@
 static bool i2c_initialized = false;
 static bool lcd_initialized = false;
 
+// Delays simples sin SysTick
 static void lcd_delay_ms(uint32_t ms) {
-    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-        vTaskDelay(pdMS_TO_TICKS(ms));
-    } else {
-        volatile uint32_t delay = ms * 1000;
-        while (delay--);
-    }
+    volatile uint32_t delay = ms * (SystemCoreClock / 1000 / 4);
+    while (delay--);
 }
 
 static void lcd_delay_us(uint32_t us) {
-    volatile uint32_t delay = us * 10;
+    volatile uint32_t delay = us * (SystemCoreClock / 1000000 / 4);
     while (delay--);
 }
 
 void i2c_init(void) {
     if (i2c_initialized) return;
 
+    // Habilitar clocks
     SIM->SCGC4 |= SIM_SCGC4_I2C1_MASK;
     SIM->SCGC5 |= SIM_SCGC5_PORTC_MASK;
 
+    // Configurar pines
     PORTC->PCR[10] = PORT_PCR_MUX(2); // SDA
     PORTC->PCR[11] = PORT_PCR_MUX(2); // SCL
 
+    // Configurar I2C - frecuencia ~100kHz
     I2C1->F = (I2C_F_ICR(0x1F) | I2C_F_MULT(0));
     I2C1->C1 = I2C_C1_IICEN_MASK;
     I2C1->S |= I2C_S_IICIF_MASK;
@@ -57,8 +55,12 @@ void i2c_init(void) {
 }
 
 static bool i2c_start_transaction(uint8_t addr) {
-    int timeout = 1000;
-    while ((I2C1->S & I2C_S_BUSY_MASK) && timeout--) lcd_delay_us(1);
+    // Esperar a que el bus esté libre (con timeout simple)
+    int timeout = 10000;
+    while ((I2C1->S & I2C_S_BUSY_MASK) && timeout--) {
+        // Pequeña espera
+    }
+    
     if (timeout <= 0) return false;
 
     I2C_TRAN;
@@ -86,17 +88,22 @@ static void i2c_stop_transaction(void) {
 
 static bool lcd_write_nibble(uint8_t nibble, uint8_t rs) {
     uint8_t data = nibble | LCD_BL | rs;
+    
     if (!i2c_write_byte(data)) return false;
     lcd_delay_us(1);
+    
     if (!i2c_write_byte(data | LCD_EN)) return false;
     lcd_delay_us(1);
+    
     if (!i2c_write_byte(data)) return false;
     lcd_delay_us(50);
+    
     return true;
 }
 
 static bool lcd_write_byte(uint8_t data, uint8_t mode) {
     if (!lcd_initialized) return false;
+    
     uint8_t hi = data & 0xF0;
     uint8_t lo = (data << 4) & 0xF0;
     uint8_t rs = mode ? LCD_RS : 0;
@@ -108,40 +115,56 @@ static bool lcd_write_byte(uint8_t data, uint8_t mode) {
     if (data == CMD_CLEAR || data == CMD_HOME)
         lcd_delay_ms(2);
     else
-        lcd_delay_us(40);
+        lcd_delay_us(50);
 
     return success;
 }
 
 bool lcd_init(void) {
     if (lcd_initialized) return true;
+    
     i2c_init();
-    lcd_delay_ms(50);
-
-    for (int i = 0; i < 3; i++) {
-        if (!i2c_start_transaction(LCD_ADDR_W)) continue;
-        if (!lcd_write_nibble(0x30, 0)) {
+    lcd_delay_ms(100); // Dar tiempo al LCD para inicializar
+    
+    // Intentar comunicación básica primero
+    bool communication_ok = false;
+    for (int attempt = 0; attempt < 3; attempt++) {
+        if (i2c_start_transaction(LCD_ADDR_W)) {
+            i2c_write_byte(0x00); // Escribir 0 para probar comunicación
             i2c_stop_transaction();
-            continue;
+            communication_ok = true;
+            break;
         }
-        i2c_stop_transaction();
-        lcd_delay_ms(i == 0 ? 5 : 1);
+        lcd_delay_ms(10);
+    }
+    
+    if (!communication_ok) {
+        return false; // No se pudo establecer comunicación I2C
+    }
+    
+    // Secuencia de inicialización LCD en modo 4-bit
+    for (int i = 0; i < 3; i++) {
+        if (i2c_start_transaction(LCD_ADDR_W)) {
+            lcd_write_nibble(0x30, 0);
+            i2c_stop_transaction();
+        }
+        lcd_delay_ms(i == 0 ? 5 : 2);
     }
 
-    if (!i2c_start_transaction(LCD_ADDR_W)) return false;
-    if (!lcd_write_nibble(0x20, 0)) {
+    // Cambiar a modo 4-bit
+    if (i2c_start_transaction(LCD_ADDR_W)) {
+        lcd_write_nibble(0x20, 0);
         i2c_stop_transaction();
-        return false;
     }
-    i2c_stop_transaction();
-    lcd_delay_ms(1);
+    lcd_delay_ms(2);
 
     lcd_initialized = true;
 
-    if (!lcd_write_byte(CMD_FUNC_SET, 0)) return false;
-    if (!lcd_write_byte(CMD_DISP_ON, 0)) return false;
-    if (!lcd_write_byte(CMD_CLEAR, 0)) return false;
-    if (!lcd_write_byte(CMD_ENTRY_MODE, 0)) return false;
+    // Configurar LCD
+    lcd_write_byte(CMD_FUNC_SET, 0);    // 4-bit, 2 líneas
+    lcd_write_byte(CMD_DISP_ON, 0);     // Display ON
+    lcd_write_byte(CMD_CLEAR, 0);       // Limpiar
+    lcd_write_byte(CMD_ENTRY_MODE, 0);  // Modo de entrada
 
     return true;
 }
@@ -171,4 +194,17 @@ bool lcd_is_initialized(void) {
 void lcd_reset(void) {
     lcd_initialized = false;
     i2c_initialized = false;
+}
+
+// Función de prueba para verificar comunicación I2C
+bool lcd_test_communication(void) {
+    if (!i2c_initialized) i2c_init();
+    
+    // Intentar comunicación simple
+    if (i2c_start_transaction(LCD_ADDR_W)) {
+        bool success = i2c_write_byte(0x00);
+        i2c_stop_transaction();
+        return success;
+    }
+    return false;
 }

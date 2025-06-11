@@ -1,459 +1,192 @@
-/*
- * startup_flow.c
- * 
- * System Startup Flow Controller Implementation
- * FRDM-KL25Z Development Board
- */
-
 #include "startup_flow.h"
 #include "../drivers/lcd_i2c.h"
 #include "../drivers/keypad.h"
 #include "../config/gpio_config.h"
-#include "../tasks/freertos_tasks.h"
 #include <string.h>
 #include <stdio.h>
+
+/*******************************************************************************
+ * External Functions
+ ******************************************************************************/
+extern void Debug_Printf(const char* format, ...);
+extern void LED_SetColor(bool red, bool green, bool blue);
+extern void Delay(uint32_t ms);
 
 /*******************************************************************************
  * Private Variables
  ******************************************************************************/
 static startup_flow_t g_startup_flow;
-static const char* SENSOR_NAMES[4] = {"Liquido 1", "Liquido 2", "Liquido 3", "Liquido 4"};
-
-/*******************************************************************************
- * Private Function Prototypes
- ******************************************************************************/
-static bool read_sensor(uint8_t sensor_id);
-static void delay_ms(uint32_t ms);
-static uint32_t get_tick_count(void);
 
 /*******************************************************************************
  * Public Functions
  ******************************************************************************/
+operation_status_t StartupFlow_Run(void) {
+    // Inicializar si no se ha hecho ya
+    if (!g_startup_flow.hardware_initialized) {
+        if (!StartupFlow_Init()) {
+            StartupFlow_ShowError("Init falló");
+            LED_SetColor(true, false, false);  // LED rojo
+            return OP_ERROR;  // Retornamos OP_ERROR si la inicialización falla
+        }
+    }
+
+    // Controlar el estado de la operación
+    operation_status_t result = OP_IN_PROGRESS;
+
+    // Ejecutar el flujo de inicialización paso a paso
+    while (result == OP_IN_PROGRESS) {
+        result = StartupFlow_Execute();  // Ejecuta paso por paso
+
+        if (result == OP_ERROR) {
+            StartupFlow_ShowError("Error ejecución");
+            LED_SetColor(true, false, false);  // LED rojo
+            Debug_Printf("StartupFlow: Failed with error\r\n");
+            break;  // Si hay error, salimos del bucle
+        }
+    }
+
+    // Si completamos correctamente
+    if (result == OP_COMPLETED) {
+        LED_SetColor(false, true, false);  // LED verde
+        Debug_Printf("StartupFlow: Completed successfully\r\n");
+    }
+
+    return result;  // Retorna el estado de la operación (ya sea OP_COMPLETED o OP_ERROR)
+}
+
 
 bool StartupFlow_Init(void) {
-    Debug_Printf("StartupFlow: Initializing...\r\n");
-    
-    // Initialize structure
     memset(&g_startup_flow, 0, sizeof(startup_flow_t));
     g_startup_flow.current_state = STARTUP_STATE_INIT;
-    g_startup_flow.previous_state = STARTUP_STATE_INIT;
-    
-    // Initialize I2C
-    Debug_Printf("Initializing I2C...\r\n");
-    i2c_init();
-    Debug_Printf("I2C Initialized.\r\n");
-
-    // Initialize LCD and Keypad (sin valor de retorno)
-    Debug_Printf("Initializing LCD...\r\n");
-    lcd_init();
-    Debug_Printf("LCD Initialized.\r\n");
-
-    Debug_Printf("Initializing Keypad...\r\n");
-    keypad_init();
-    Debug_Printf("Keypad Initialized.\r\n");
-    
-    Debug_Printf("StartupFlow: Initialization complete\r\n");
+    g_startup_flow.hardware_initialized = false;
     return true;
 }
 
+operation_status_t StartupFlow_Execute(void) {
+    switch (g_startup_flow.current_state) {
+        case STARTUP_STATE_INIT:
+            Debug_Printf("StartupFlow: Initializing hardware...\r\n");
+            
+            // Inicializar I2C primero
+            i2c_init();
+            Delay(100);
+            
+            // Probar comunicación I2C antes de inicializar LCD
+            if (!lcd_test_communication()) {
+                Debug_Printf("StartupFlow: I2C communication failed\r\n");
+                g_startup_flow.current_state = STARTUP_STATE_ERROR;
+                return OP_ERROR;
+            }
+            
+            Debug_Printf("StartupFlow: I2C communication OK\r\n");
+            
+            // Inicializar LCD
+            if (!lcd_init()) {
+                Debug_Printf("StartupFlow: LCD initialization failed\r\n");
+                g_startup_flow.current_state = STARTUP_STATE_ERROR;
+                return OP_ERROR;
+            }
+            
+            Debug_Printf("StartupFlow: LCD initialized successfully\r\n");
+            
+            // Inicializar keypad
+            keypad_init();
+            Debug_Printf("StartupFlow: Keypad initialized\r\n");
+            
+            // Mostrar pantalla de inicio
+            StartupFlow_ShowInitScreen();
+            g_startup_flow.current_state = STARTUP_STATE_INITIALIZING;
+            g_startup_flow.hardware_initialized = true;
+            
+            Debug_Printf("StartupFlow: Hardware initialization complete\r\n");
+            break;
 
-bool StartupFlow_Execute(void) {
-    Debug_Printf("StartupFlow: Starting execution\r\n");
-    
-    g_startup_flow.total_startup_time = get_tick_count();
-    
-    while (!g_startup_flow.startup_complete && !g_startup_flow.error_occurred) {
-        
-        // Update state entry time on state change
-        if (g_startup_flow.current_state != g_startup_flow.previous_state) {
-            g_startup_flow.state_enter_time = get_tick_count();
-            g_startup_flow.previous_state = g_startup_flow.current_state;
-            Debug_Printf("StartupFlow: State changed to %s\r\n", 
-                        StartupFlow_StateToString(g_startup_flow.current_state));
-        }
-        
-        switch (g_startup_flow.current_state) {
-            case STARTUP_STATE_INIT:
-                g_startup_flow.current_state = STARTUP_STATE_INITIALIZING;
-                break;
-                
-            case STARTUP_STATE_INITIALIZING:
-                StartupFlow_ShowInitScreen();
-                delay_ms(2000);  // Show init screen for 2 seconds
-                g_startup_flow.current_state = STARTUP_STATE_CHECKING_SENSORS;
-                break;
-                
-            case STARTUP_STATE_CHECKING_SENSORS:
-                if (StartupFlow_CheckSensors()) {
-                    g_startup_flow.current_state = STARTUP_STATE_MODE_SELECTION;
-                } else {
-                    g_startup_flow.current_state = STARTUP_STATE_SENSOR_ERROR;
-                }
-                break;
-                
-            case STARTUP_STATE_SENSOR_ERROR:
-                StartupFlow_ShowSensorError(&g_startup_flow.sensor_status);
-                if (g_startup_flow.sensor_status.can_operate) {
-                    g_startup_flow.current_state = STARTUP_STATE_MODE_SELECTION;
-                } else {
-                    StartupFlow_ShowRefillInstructions();  // Instrucciones de recarga
-                    g_startup_flow.current_state = STARTUP_STATE_WAITING_REFILL;  // Estado de espera para relleno
-                }
-                break;
-                
-            case STARTUP_STATE_MODE_SELECTION:
-                g_startup_flow.selected_mode = StartupFlow_SelectMode();
-                if (g_startup_flow.selected_mode == OPERATION_MODE_NORMAL) {
-                    g_startup_flow.current_state = STARTUP_STATE_READY;
-                } else if (g_startup_flow.selected_mode == OPERATION_MODE_REFILL) {
-                    g_startup_flow.current_state = STARTUP_STATE_REFILL_MODE;
-                } else {
-                    // Invalid selection, stay in mode selection
-                    continue;
-                }
-                break;
-                
-            case STARTUP_STATE_REFILL_MODE:
-                StartupFlow_ShowRefillInstructions();
-                g_startup_flow.current_state = STARTUP_STATE_WAITING_REFILL;
-                break;
-                
-            case STARTUP_STATE_WAITING_REFILL:
-                // Wait for # key press (handled in ShowRefillInstructions)
-                g_startup_flow.current_state = STARTUP_STATE_RECHECK_SENSORS;
-                break;
-                
-            case STARTUP_STATE_RECHECK_SENSORS:
-                if (StartupFlow_CheckSensors()) {
-                    g_startup_flow.current_state = STARTUP_STATE_READY;
-                } else {
-                    g_startup_flow.current_state = STARTUP_STATE_SENSOR_ERROR;
-                }
-                break;
-                
-            case STARTUP_STATE_READY:
-                StartupFlow_ShowReadyScreen();
-                g_startup_flow.current_state = STARTUP_STATE_COMPLETE;
-                break;
-                
-            case STARTUP_STATE_COMPLETE:
-                g_startup_flow.startup_complete = true;
-                break;
-                
-            case STARTUP_STATE_ERROR:
-            default:
-                g_startup_flow.error_occurred = true;
-                break;
-        }
-        
-        // Small delay to prevent tight loop
-        delay_ms(10);
+        case STARTUP_STATE_INITIALIZING:
+            // Mostrar pantalla por 2 segundos
+            Debug_Printf("StartupFlow: Showing init screen...\r\n");
+            Delay(1000);
+            g_startup_flow.current_state = STARTUP_STATE_COMPLETE;
+            break;
+
+        case STARTUP_STATE_COMPLETE:
+            Debug_Printf("StartupFlow: Startup completed successfully\r\n");
+            return OP_COMPLETED;
+
+        case STARTUP_STATE_ERROR:
+            Debug_Printf("StartupFlow: Error state\r\n");
+            StartupFlow_ShowError("Hardware Init");
+            return OP_ERROR;
     }
     
-    g_startup_flow.total_startup_time = get_tick_count() - g_startup_flow.total_startup_time;
-    
-    if (g_startup_flow.startup_complete) {
-        Debug_Printf("StartupFlow: Completed successfully in %lu ms\r\n", 
-                    g_startup_flow.total_startup_time);
-        return true;
-    } else {
-        Debug_Printf("StartupFlow: Failed with error\r\n");
-        return false;
-    }
+    return OP_IN_PROGRESS;
 }
 
-void StartupFlow_Task(void *pvParameters) {
-    Debug_Printf("StartupFlow: Task started\r\n");
-    
-    // Initialize startup flow
-    if (!StartupFlow_Init()) {
-        Debug_Printf("StartupFlow: Task initialization failed\r\n");
-        LED_SetColor(true, false, false);  // Red error
-        vTaskDelete(NULL);
-        return;
-    }
-    
-    // Execute startup flow
-    if (StartupFlow_Execute()) {
-        Debug_Printf("StartupFlow: Task completed successfully\r\n");
-        LED_SetColor(false, true, false);  // Green success
-        
-        // Signal other tasks that startup is complete
-        if (xEventGroupSystem) {
-            xEventGroupSetBits(xEventGroupSystem, (1 << 1));  // Usar bit 1 para startup complete
-            Debug_Printf("StartupFlow: Startup complete signal sent\r\n");
-        }
-    } else {
-        Debug_Printf("StartupFlow: Task failed\r\n");
-        LED_SetColor(true, false, false);  // Red error
-    }
-    
-    // Task complete, delete self
-    Debug_Printf("StartupFlow: Task ending\r\n");
-    vTaskDelete(NULL);
-}
 /*******************************************************************************
  * Screen Display Functions
  ******************************************************************************/
-
 void StartupFlow_ShowInitScreen(void) {
-    lcd_clear();
-    lcd_set_cursor(0, 0);  // Primera línea
-    lcd_print("Robo-Bar v1.0");
-    lcd_set_cursor(1, 0);  // Segunda línea
-    lcd_print("Inicializando...");
-    Debug_Printf("StartupFlow: Showing initialization screen\r\n");
-}
-
-bool StartupFlow_CheckSensors(void) {
-    lcd_clear();
-    lcd_set_cursor(0, 0);  // Primera línea
-    lcd_print("Verificando...");
-    lcd_set_cursor(1, 0);  // Segunda línea
-    lcd_print("Sensores");
-    
-    Debug_Printf("StartupFlow: Checking sensors...\r\n");
-    
-    // Reset sensor status
-    memset(&g_startup_flow.sensor_status, 0, sizeof(sensor_status_t));
-    
-    // Check each sensor
-    g_startup_flow.sensor_status.sensor_1_ok = read_sensor(1);
-    g_startup_flow.sensor_status.sensor_2_ok = read_sensor(2);
-    g_startup_flow.sensor_status.sensor_3_ok = read_sensor(3);
-    g_startup_flow.sensor_status.sensor_4_ok = read_sensor(4);
-    
-    // Create bitmask of low sensors
-    if (!g_startup_flow.sensor_status.sensor_1_ok) g_startup_flow.sensor_status.low_sensors |= (1 << 0);
-    if (!g_startup_flow.sensor_status.sensor_2_ok) g_startup_flow.sensor_status.low_sensors |= (1 << 1);
-    if (!g_startup_flow.sensor_status.sensor_3_ok) g_startup_flow.sensor_status.low_sensors |= (1 << 2);
-    if (!g_startup_flow.sensor_status.sensor_4_ok) g_startup_flow.sensor_status.low_sensors |= (1 << 3);
-    
-    // Check if system can operate (at least 2 sensors OK)
-    uint8_t ok_count = 0;
-    if (g_startup_flow.sensor_status.sensor_1_ok) ok_count++;
-    if (g_startup_flow.sensor_status.sensor_2_ok) ok_count++;
-    if (g_startup_flow.sensor_status.sensor_3_ok) ok_count++;
-    if (g_startup_flow.sensor_status.sensor_4_ok) ok_count++;
-    
-    g_startup_flow.sensor_status.can_operate = (ok_count >= 2);
-    
-    Debug_Printf("StartupFlow: Sensor check complete - OK:%d, Low:%02X, CanOperate:%d\r\n",
-                ok_count, g_startup_flow.sensor_status.low_sensors, 
-                g_startup_flow.sensor_status.can_operate);
-    
-    delay_ms(1000);  // Show checking message
-    
-    return (g_startup_flow.sensor_status.low_sensors == 0);
-}
-
-void StartupFlow_ShowSensorError(const sensor_status_t* sensor_status) {
-    lcd_clear();
-    
-    if (sensor_status->can_operate) {
-        lcd_set_cursor(0, 0);  // Primera línea
-        lcd_print("Niveles bajos:");
-        
-        // Show which sensors are low
-        char low_sensors_str[17] = {0};
-        int pos = 0;
-        
-        for (int i = 0; i < 4; i++) {
-            if (sensor_status->low_sensors & (1 << i)) {
-                if (pos > 0) {
-                    low_sensors_str[pos++] = ',';
-                }
-                low_sensors_str[pos++] = '1' + i;  // Sensor numbers 1-4
-            }
-        }
-        
-        lcd_set_cursor(1, 0);  // Segunda línea
-        lcd_print(low_sensors_str);
-        Debug_Printf("StartupFlow: Showing sensor error - Low sensors: %s\r\n", low_sensors_str);
-        
-        delay_ms(3000);  // Show error for 3 seconds
-    } else {
-        lcd_set_cursor(0, 0);  // Primera línea
-        lcd_print("ERROR CRITICO:");
-        lcd_set_cursor(1, 0);  // Segunda línea
-        lcd_print("Poco liquido");
-        Debug_Printf("StartupFlow: Critical error - insufficient liquids\r\n");
-        delay_ms(3000);
-    }
-}
-
-operation_mode_t StartupFlow_SelectMode(void) {
-    lcd_clear();
-    lcd_set_cursor(0, 0);
-    lcd_print("1-Normal");
-    lcd_set_cursor(1, 0);
-    lcd_print("2-Resanado");
-
-    Debug_Printf("StartupFlow: Waiting for mode selection...\r\n");
-
-    char key = '\0';
-    while (key != '1' && key != '2') {
-        key = keypad_getkey();  // Espera una tecla
-        Debug_Printf("StartupFlow: Key pressed: %c\r\n", key);
-
-        if (key == '1') {
-            Debug_Printf("StartupFlow: Normal mode selected\r\n");
-            return OPERATION_MODE_NORMAL;
-        } else if (key == '2') {
-            Debug_Printf("StartupFlow: Refill mode selected\r\n");
-            return OPERATION_MODE_REFILL;
-        }
-    }
-
-    return OPERATION_MODE_NORMAL;  // Fallback por defecto
-}
-
-
-void StartupFlow_ShowRefillInstructions(void) {
-    lcd_clear();
-    lcd_set_cursor(0, 0);  // Primera línea
-    lcd_print("Rellene faltantes");
-    lcd_set_cursor(1, 0);  // Segunda línea
-    lcd_print("Presione #");
-    
-    Debug_Printf("StartupFlow: Waiting for refill completion...\r\n");
-    
-    char key = '\0';
-    while (key != '#') {
-        key = keypad_getkey();  // Espera la tecla presionada
-        Debug_Printf("StartupFlow: Key pressed during refill: %c\r\n", key);
+    if (!lcd_is_initialized()) {
+        Debug_Printf("StartupFlow: LCD not initialized, cannot show screen\r\n");
+        return;
     }
     
-    Debug_Printf("StartupFlow: Refill completed, proceeding to recheck\r\n");
-}
-
-
-void StartupFlow_ShowReadyScreen(void) {
-    lcd_clear();  // Limpiar la pantalla
-    lcd_set_cursor(0, 0);  // Establecer el cursor en la primera línea
-    lcd_print("Listo!");  // Mostrar el mensaje "Listo!" en la pantalla
-    lcd_set_cursor(1, 0);  // Establecer el cursor en la segunda línea
-    lcd_print("Presione *");  // Mostrar el mensaje "Presione *"
-
-    Debug_Printf("StartupFlow: System ready, waiting for start command...\r\n");
-
-    char key = '\0';
-    while (key != '*') {
-        key = keypad_getkey();  // Esperar a que se presione una tecla
-        Debug_Printf("StartupFlow: Key pressed at ready screen: %c\r\n", key);
+    Debug_Printf("StartupFlow: Displaying init screen\r\n");
+    
+    if (!lcd_clear()) {
+        Debug_Printf("StartupFlow: Failed to clear LCD\r\n");
+        return;
     }
-
-    Debug_Printf("StartupFlow: Start command received\r\n");
+    
+    if (!lcd_set_cursor(0, 0)) {
+        Debug_Printf("StartupFlow: Failed to set cursor\r\n");
+        return;
+    }
+    
+    if (!lcd_print("Robo-Bar v1.0")) {
+        Debug_Printf("StartupFlow: Failed to print line 1\r\n");
+        return;
+    }
+    
+    if (!lcd_set_cursor(1, 0)) {
+        Debug_Printf("StartupFlow: Failed to set cursor line 2\r\n");
+        return;
+    }
+    
+    if (!lcd_print("Inicializando...")) {
+        Debug_Printf("StartupFlow: Failed to print line 2\r\n");
+        return;
+    }
+    
+    Debug_Printf("StartupFlow: Init screen displayed successfully\r\n");
 }
-
 
 void StartupFlow_ShowError(const char* error_msg) {
+    Debug_Printf("StartupFlow: Showing error: %s\r\n", error_msg);
+    
+    if (!lcd_is_initialized()) {
+        Debug_Printf("StartupFlow: LCD not initialized for error display\r\n");
+        return;
+    }
+    
     lcd_clear();
     lcd_set_cursor(0, 0);
     lcd_print("ERROR:");
-    lcd_set_cursor(1, 0);
-    lcd_print(error_msg);
-
-    Debug_Printf("StartupFlow: Error displayed: %s\r\n", error_msg);
-
-    // Flash red LED
-    for (int i = 0; i < 10; i++) {
-        LED_SetColor(true, false, false);   // Red
-        delay_ms(200);
-        LED_SetColor(false, false, false);  // Off
-        delay_ms(200);
+    
+    if (error_msg) {
+        lcd_set_cursor(1, 0);
+        lcd_print(error_msg);
     }
 }
 
-
 /*******************************************************************************
- * Getter Functions
+ * Helper Functions
  ******************************************************************************/
-
-startup_flow_state_t StartupFlow_GetState(void) {
-    return g_startup_flow.current_state;
-}
-
-operation_mode_t StartupFlow_GetMode(void) {
-    return g_startup_flow.selected_mode;
-}
-
-bool StartupFlow_IsComplete(void) {
-    return g_startup_flow.startup_complete;
-}
-
-const sensor_status_t* StartupFlow_GetSensorStatus(void) {
-    return &g_startup_flow.sensor_status;
-}
-
-void StartupFlow_Restart(void) {
-    Debug_Printf("StartupFlow: Restarting...\r\n");
-    memset(&g_startup_flow, 0, sizeof(startup_flow_t));
-    g_startup_flow.current_state = STARTUP_STATE_INIT;
-}
-
 const char* StartupFlow_StateToString(startup_flow_state_t state) {
     switch (state) {
         case STARTUP_STATE_INIT: return "INIT";
         case STARTUP_STATE_INITIALIZING: return "INITIALIZING";
-        case STARTUP_STATE_CHECKING_SENSORS: return "CHECKING_SENSORS";
-        case STARTUP_STATE_SENSOR_ERROR: return "SENSOR_ERROR";
-        case STARTUP_STATE_MODE_SELECTION: return "MODE_SELECTION";
-        case STARTUP_STATE_REFILL_MODE: return "REFILL_MODE";
-        case STARTUP_STATE_WAITING_REFILL: return "WAITING_REFILL";
-        case STARTUP_STATE_RECHECK_SENSORS: return "RECHECK_SENSORS";
-        case STARTUP_STATE_READY: return "READY";
         case STARTUP_STATE_ERROR: return "ERROR";
         case STARTUP_STATE_COMPLETE: return "COMPLETE";
         default: return "UNKNOWN";
     }
-}
-
-/*******************************************************************************
- * Private Helper Functions
- ******************************************************************************/
-
-static bool read_sensor(uint8_t sensor_id) {
-    bool sensor_value = false;
-    
-    switch (sensor_id) {
-        case 1:
-            sensor_value = GPIO_ReadPinInput(SENSOR_1_GPIO, SENSOR_1_PIN);
-            break;
-        case 2:
-            sensor_value = GPIO_ReadPinInput(SENSOR_2_GPIO, SENSOR_2_PIN);
-            break;
-        case 3:
-            sensor_value = GPIO_ReadPinInput(SENSOR_3_GPIO, SENSOR_3_PIN);
-            break;
-        case 4:
-            sensor_value = GPIO_ReadPinInput(SENSOR_4_GPIO, SENSOR_4_PIN);
-            break;
-        default:
-            Debug_Printf("StartupFlow: Invalid sensor ID: %d\r\n", sensor_id);
-            return false;
-    }
-    
-    Debug_Printf("StartupFlow: Sensor %d = %s\r\n", sensor_id, sensor_value ? "HIGH" : "LOW");
-    
-    // Assuming sensors are active HIGH when liquid is present
-    // If your sensors are active LOW, change this to: return !sensor_value;
-    return sensor_value;
-}
-
-// For task use
-// static void delay_ms(uint32_t ms) {
-//     // Use FreeRTOS delay
-//     vTaskDelay(pdMS_TO_TICKS(ms));
-// }
-
-static void delay_ms(uint32_t ms) {
-    // Simple delay basado en ciclos de CPU. Ajusta el número de ciclos según lo necesario
-    volatile int i;
-    for (i = 0; i < ms * 1000; i++);
-}
-
-static uint32_t get_tick_count(void) {
-    // Return FreeRTOS tick count in milliseconds
-    return (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
 }

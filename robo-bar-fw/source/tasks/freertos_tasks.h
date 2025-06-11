@@ -33,17 +33,6 @@ extern uint32_t g_servo_test_count;
 extern uint32_t g_heartbeat_count;
 extern uint32_t g_sensor_read_count;  // Nuevo contador agregado
 
-/* Funciones auxiliares accesibles fuera de freertos_tasks.c */
-void Debug_Printf(const char* format, ...);
-void LED_SetColor(bool red, bool green, bool blue);
-
-/* Task functions */
-void vTaskSystemInit(void *pvParameters);
-void vTaskLedTest(void *pvParameters);
-void vTaskServoTest(void *pvParameters);
-void vTaskSystemMonitor(void *pvParameters);
-void vTaskSensorRead(void *pvParameters);  // Nueva función de tarea
-
 /* Timer callback */
 void vTimerCallbackSystemHeartbeat(TimerHandle_t xTimer);
 

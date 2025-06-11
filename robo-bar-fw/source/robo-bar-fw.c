@@ -1,184 +1,161 @@
 /*
- * Robo-Bar System - Main Application
+ * Robo-Bar System - Main Application (Simplified)
  * FRDM-KL25Z Development Board
  */
-#include "tasks/freertos_tasks.h"
 #include "config/board_init.h"
 #include "core/startup_flow.h"
 #include "core/select_beverage_flow.h"
+#include "core/sensor_check_flow.h"
+#include "shared/system_types.h"
+#include <stdarg.h>
+#include <stdio.h>
 
-// Variables globales necesarias (ya declaradas en freertos_tasks.h)
-extern SemaphoreHandle_t xSemaphoreUART;
-extern EventGroupHandle_t xEventGroupSystem;
-extern TaskHandle_t xTaskHandleSystemMonitor;
-extern TaskHandle_t xTaskHandleSensorRead;
+// Estados del sistema principal
+typedef enum {
+    SYSTEM_STATE_STARTUP,
+    SYSTEM_STATE_SENSOR_CHECK,
+    SYSTEM_STATE_BEVERAGE_SELECTION,
+    SYSTEM_STATE_WAITING_RESTART,
+    SYSTEM_STATE_ERROR
+} system_state_t;
 
-#define STARTUP_COMPLETE_BIT (1 << 1)  // Bit para indicar que el flujo de arranque ha finalizado
+// Variables globales del sistema
+static system_state_t g_system_state = SYSTEM_STATE_STARTUP;
+static bool g_startup_done = false;
 
-void vTaskSequenceManager(void *pvParameters)
-{
-    Debug_Printf("=== Starting Sequence Manager ===\r\n");
-    
-    // Paso 1: Ejecutar StartupFlow_Task y esperar a que termine
-    Debug_Printf("=== Starting Startup Flow ===\r\n");
-   
-    // Crear y ejecutar la tarea de startup (sin parámetros adicionales)
-    TaskHandle_t xStartupTaskHandle = NULL;
-    BaseType_t xResult = xTaskCreate(StartupFlow_Task, "StartupFlow", 512, NULL,
-                                   tskIDLE_PRIORITY + 3, &xStartupTaskHandle);
-    
-    if (xResult != pdPASS) {
-        Debug_Printf("ERROR: Failed to create StartupFlow task\r\n");
-        LED_SetColor(true, false, false); // Rojo - Error
-        vTaskDelete(NULL);
-        return;
-    }
-   
-    // Esperar a que el startup flow termine (usando el EventGroup del sistema)
-    EventBits_t uxBits = xEventGroupWaitBits(
-        xEventGroupSystem,
-        STARTUP_COMPLETE_BIT,
-        pdFALSE,  // No limpiar el bit
-        pdTRUE,   // Esperar a que esté set
-        pdMS_TO_TICKS(30000)  // Timeout de 30 segundos
-    );
-   
-    if (uxBits & STARTUP_COMPLETE_BIT) {
-        Debug_Printf("Startup Flow completed successfully!\r\n");
-        Debug_Printf("=== Starting Additional Tasks ===\r\n");
-       
-        // Paso 2: Crear las tareas adicionales
-        
-        // Tarea de monitoreo del sistema
-        BaseType_t result = xTaskCreate(vTaskBeverageFlow, "BeverageFlow", 512, NULL, tskIDLE_PRIORITY + 2, NULL);
-        if (result != pdPASS) {
-            Debug_Printf("ERROR: Failed to create BeverageFlow task\r\n");
-            LED_SetColor(true, false, false); // Rojo - Error
-        } else {
-            Debug_Printf("BeverageFlow task created successfully\r\n");
-        }
-        
-    } else {
-        Debug_Printf("ERROR: Startup Flow failed to complete (timeout)!\r\n");
-        LED_SetColor(true, false, false); // Rojo - Error
-    }
-   
-    // Esta tarea ya cumplió su propósito, se puede eliminar
-    Debug_Printf("Sequence Manager task completing\r\n");
-    vTaskDelete(NULL);
-}
+/*******************************************************************************
+ * Funciones de Utilidad
+ ******************************************************************************/
+void Debug_Printf(const char* format, ...) {
+    va_list args;
+    char buffer[256];
 
-int main(void)
-{
-    BaseType_t xResult;
-    
-    // Inicializar hardware (incluyendo UART)
-    BOARD_InitAll();
-   
-    // Crear los objetos de FreeRTOS necesarios PRIMERO
-    xSemaphoreUART = xSemaphoreCreateMutex();
-    if (xSemaphoreUART == NULL) {
-        printf("ERROR: Failed to create UART semaphore\r\n");
-        while(1);
-    }
-   
-    // Crear el grupo de eventos del sistema
-    xEventGroupSystem = xEventGroupCreate();
-    if (xEventGroupSystem == NULL) {
-        printf("ERROR: Failed to create system event group\r\n");
-        while(1);
-    }
-   
-    // Crear otros objetos de FreeRTOS necesarios
-    // TODO: Definir system_message_t en el header apropiado si se va a usar
-    /*
-    typedef struct {
-        uint8_t type;
-        uint32_t data;
-    } system_message_t;
-    
-    xQueueSystemMessages = xQueueCreate(10, sizeof(system_message_t));
-    if (xQueueSystemMessages == NULL) {
-        printf("ERROR: Failed to create system messages queue\r\n");
-        while(1);
-    }
-    */
-    
-    // Crear timer de heartbeat
-    xTimerSystemHeartbeat = xTimerCreate("Heartbeat",
-                                        pdMS_TO_TICKS(1000),
-                                        pdTRUE,
-                                        (void *)0,
-                                        vTimerCallbackSystemHeartbeat);
-    if (xTimerSystemHeartbeat == NULL) {
-        printf("ERROR: Failed to create heartbeat timer\r\n");
-        while(1);
-    }
-   
-    // Prueba inicial con LED
-    LED_SetColor(true, true, false); // Amarillo - Inicializando
-   
-    // Ahora sí podemos usar Debug_Printf porque el semáforo ya existe
-    Debug_Printf("\r\n\r\n=== Robo-Bar System Starting ===\r\n");
-    Debug_Printf("System: %s v%d.%d.%d\r\n", SYSTEM_NAME,
-                 SYSTEM_VERSION_MAJOR, SYSTEM_VERSION_MINOR, SYSTEM_VERSION_PATCH);
-    Debug_Printf("MCU: FRDM-KL25Z (ARM Cortex-M0+)\r\n");
-    Debug_Printf("Hardware initialization complete\r\n");
-   
-    // Iniciar el timer de heartbeat
-    if (xTimerStart(xTimerSystemHeartbeat, 0) != pdPASS) {
-        Debug_Printf("ERROR: Failed to start heartbeat timer\r\n");
-        while(1);
-    }
-   
-    // todo: uncomment master task creation when ready
-    // Crear la tarea maestra que maneja la secuencia
-    xResult = xTaskCreate(vTaskSequenceManager, "SequenceManager", 512, NULL,
-                         tskIDLE_PRIORITY + 1, NULL);
-    if (xResult != pdPASS) {
-        Debug_Printf("ERROR: Failed to create SequenceManager task\r\n");
-        while(1);
-    }
-   
-    Debug_Printf("Starting FreeRTOS scheduler...\r\n");
-   
-    // Iniciar el scheduler
-    vTaskStartScheduler();
-   
-    // Si llegamos aquí, el scheduler falló
-    LED_SetColor(true, false, false);
-    printf("ERROR: FreeRTOS scheduler failed to start!\r\n");
-   
-    while (1) {
-        LED_SetColor(true, false, false);
-        for (volatile int i = 0; i < 250000; i++);
-        LED_SetColor(false, false, false);
-        for (volatile int i = 0; i < 250000; i++);
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
+    for (int i = 0; buffer[i] != '\0'; i++) {
+        while (!(UART0->S1 & UART_S1_TDRE_MASK));
+        UART0->D = buffer[i];
     }
 }
 
-Debug_Printf(const char* format, ...) {
-    if (xSemaphoreUART != NULL) {
-        if (xSemaphoreTake(xSemaphoreUART, pdMS_TO_TICKS(100)) == pdTRUE) {
-            va_list args;
-            char buffer[256];
-
-            va_start(args, format);
-            vsnprintf(buffer, sizeof(buffer), format, args);
-            va_end(args);
-
-            for (int i = 0; buffer[i] != '\0'; i++) {
-                while (!(UART0->S1 & UART_S1_TDRE_MASK));
-                UART0->D = buffer[i];
-            }
-
-            xSemaphoreGive(xSemaphoreUART);
-        }
-    }
-}
-
-LED_SetColor(bool red, bool green, bool blue) {
+void LED_SetColor(bool red, bool green, bool blue) {
     GPIO_WritePinOutput(LED_RED_GPIO, LED_RED_PIN, !red);
     GPIO_WritePinOutput(LED_GREEN_GPIO, LED_GREEN_PIN, !green);
     GPIO_WritePinOutput(LED_BLUE_GPIO, LED_BLUE_PIN, !blue);
+}
+
+// Delay simple sin SysTick
+void Delay(uint32_t ms) {
+    // Aproximado para 48MHz (ajusta según tu frecuencia)
+    volatile uint32_t delay = ms * (SystemCoreClock / 1000 / 4);
+    while (delay--);
+}
+
+/*******************************************************************************
+ * Controlador Principal del Sistema
+ ******************************************************************************/
+void SystemController_Run(void) {
+    static operation_status_t op_status = OP_IN_PROGRESS;
+
+    switch (g_system_state) {
+        case SYSTEM_STATE_STARTUP:
+            if (!g_startup_done) {
+                Debug_Printf("System: Starting initialization...\r\n");
+                LED_SetColor(true, true, false); // Amarillo - Inicializando
+                
+                operation_status_t op_status = StartupFlow_Run();
+
+                if (op_status == OP_COMPLETED) {
+                    Debug_Printf("System: Startup completed\r\n");
+                    g_startup_done = true;
+                    g_system_state = SYSTEM_STATE_SENSOR_CHECK;
+                    LED_SetColor(false, true, false); // Verde
+                    Delay(1000);
+                }
+                else if (op_status == OP_ERROR) {
+                    Debug_Printf("ERROR: Startup failed!\r\n");
+                    LED_SetColor(true, false, false); // Rojo
+                    g_system_state = SYSTEM_STATE_ERROR;
+                }
+            }
+            else {
+                g_system_state = SYSTEM_STATE_SENSOR_CHECK;
+            }
+            break;
+
+        case SYSTEM_STATE_SENSOR_CHECK:
+            Debug_Printf("System: Checking sensors...\r\n");
+            LED_SetColor(false, false, true); // Azul - Verificando sensores
+            
+            op_status = SensorCheckFlow_Execute();
+            
+            if (op_status == OP_COMPLETED) {
+                Debug_Printf("System: Sensors OK\r\n");
+                g_system_state = SYSTEM_STATE_BEVERAGE_SELECTION;
+                LED_SetColor(false, true, false); // Verde
+                Delay(500);
+            }
+            else if (op_status == OP_ERROR) {
+                Debug_Printf("ERROR: Sensor check failed!\r\n");
+                LED_SetColor(true, false, false); // Rojo
+                g_system_state = SYSTEM_STATE_ERROR;
+            }
+            break;
+
+        case SYSTEM_STATE_BEVERAGE_SELECTION:
+            Debug_Printf("System: Ready for beverage selection\r\n");
+            LED_SetColor(true, false, true); // Magenta - Selección
+            
+            op_status = BeverageSelectFlow_Execute();
+            
+            if (op_status == OP_COMPLETED) {
+                Debug_Printf("System: Beverage prepared!\r\n");
+                g_system_state = SYSTEM_STATE_WAITING_RESTART;
+                LED_SetColor(false, true, false); // Verde
+            }
+            else if (op_status == OP_ERROR) {
+                Debug_Printf("ERROR: Beverage selection failed!\r\n");
+                LED_SetColor(true, false, false); // Rojo
+                g_system_state = SYSTEM_STATE_ERROR;
+            }
+            break;
+
+        case SYSTEM_STATE_WAITING_RESTART:
+            Debug_Printf("System: Cycle completed. Restarting in 3 seconds...\r\n");
+            LED_SetColor(false, true, false); // Verde
+            Delay(3000);
+            g_system_state = SYSTEM_STATE_SENSOR_CHECK;
+            break;
+
+        case SYSTEM_STATE_ERROR:
+            Debug_Printf("System: Critical error! Attempting recovery in 5 seconds...\r\n");
+            LED_SetColor(true, false, false); // Rojo
+            Delay(5000);
+            // Intentar recuperación reiniciando el flujo
+            g_system_state = SYSTEM_STATE_SENSOR_CHECK;
+            break;
+    }
+}
+
+/*******************************************************************************
+ * Función Principal
+ ******************************************************************************/
+int main(void) {
+    // Inicializar hardware básico
+    BOARD_InitAll();
+    
+    // Mensaje inicial
+    Debug_Printf("\r\n\r\n=== Robo-Bar System (Simplified) ===\r\n");
+    Debug_Printf("System Initialized. Starting main loop...\r\n");
+    
+    // LED inicial - Amarillo para indicar inicialización
+    LED_SetColor(true, true, false);
+    
+    // Bucle principal
+    while (1) {
+        SystemController_Run();
+        Delay(100); // Pequeño delay para estabilidad
+    }
 }
