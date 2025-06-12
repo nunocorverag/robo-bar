@@ -242,7 +242,7 @@ void BeverageSelectFlow_ShowCompletionScreen(const char* beverage_name) {
     
     lcd_clear();
     lcd_set_cursor(0, 0);
-    lcd_print("Bebida lista!");
+    lcd_print("Líquidos dispensados");
     lcd_set_cursor(1, 0);
     lcd_print(beverage_name);
     
