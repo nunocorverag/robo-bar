@@ -22,7 +22,7 @@ Este documento lista todas las conexiones de pines usadas en el proyecto Robo-Ba
 | Servo 2         | PORTA    | 12         | TPM1_CH0    | Liquid dispensing servo 2     |
 | Servo 3         | PORTA    | 13         | TPM1_CH1    | Liquid dispensing servo 3     |
 | Servo 4         | PORTD    | 5          | TPM0_CH5    | Liquid dispensing servo 4     |
-| Direction Servo | PORTD    | 6          | TPM0_CH6    | Servo to control direction    |
+| Direction Servo | PORTD    | 0          | TPM0_CH0    | Servo to control direction    |
 
 ---
 
@@ -72,12 +72,10 @@ Este documento lista todas las conexiones de pines usadas en el proyecto Robo-Ba
 
 ---
 
-## H-Bridge Motor Control
+## Motor Relay Control
 
-| Signal        | MCU Port  | Pin Number | Description         |
-|---------------|-----------|------------|---------------------|
-| Motor Control | PORTE     | 23         | H-Bridge Input 1 (Motor direction control)  |
-| Motor Control | PORTE     | 29         | H-Bridge Input 2 (Motor direction control)  |
-| Motor Enable  | PORTE     | 30         | H-Bridge Enable (Motor enable)  |
+| Signal        | MCU Port | Pin Number | Description              |
+|---------------|----------|------------|--------------------------|
+| Motor Enable  | PORTE    | 31         | Relay control for motor  |
 
 ---
