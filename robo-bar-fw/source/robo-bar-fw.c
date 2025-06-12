@@ -180,7 +180,8 @@ int main(void) {
     
     // Bucle principal
     while (1) {
-        SystemController_Run();
+
+    	SystemController_Run();
         Delay(100); // Pequeño delay para estabilidad
     }
 }
