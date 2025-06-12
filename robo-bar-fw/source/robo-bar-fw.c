@@ -1,11 +1,12 @@
 /*
- * Robo-Bar System - Main Application (Simplified)
+ * Robo-Bar System - Main Application (Complete with Mixing/Serving)
  * FRDM-KL25Z Development Board
  */
 #include "config/board_init.h"
 #include "core/startup_flow.h"
 #include "core/select_beverage_flow.h"
 #include "core/sensor_check_flow.h"
+#include "core/mixing_serving_flow.h"
 #include "shared/system_types.h"
 #include <stdarg.h>
 #include <stdio.h>
@@ -15,6 +16,7 @@ typedef enum {
     SYSTEM_STATE_STARTUP,
     SYSTEM_STATE_SENSOR_CHECK,
     SYSTEM_STATE_BEVERAGE_SELECTION,
+    SYSTEM_STATE_MIXING_SERVING,
     SYSTEM_STATE_WAITING_RESTART,
     SYSTEM_STATE_ERROR
 } system_state_t;
@@ -122,12 +124,14 @@ void SystemController_Run(void) {
             op_status = BeverageSelectFlow_Run();
             
             if (op_status == OP_COMPLETED) {
-                Debug_Printf("System: Beverage prepared!\r\n");
-                g_system_state = SYSTEM_STATE_WAITING_RESTART;
+                Debug_Printf("System: Beverage dispensed! Starting mixing and serving...\r\n");
+                g_system_state = SYSTEM_STATE_MIXING_SERVING;
                 LED_SetColor(false, true, false); // Verde
+                Delay(500);
                 
-                // RESTART: Reset op_status para el próximo ciclo
-                op_status = OP_IN_PROGRESS;
+                // RESTART: Preparar el flujo de mezclado y servido
+                MixingServingFlow_Restart();
+                op_status = OP_IN_PROGRESS; // Reset op_status
             }
             else if (op_status == OP_ERROR) {
                 Debug_Printf("ERROR: Beverage selection failed!\r\n");
@@ -136,10 +140,31 @@ void SystemController_Run(void) {
             }
             break;
 
+        case SYSTEM_STATE_MIXING_SERVING:
+            Debug_Printf("System: Mixing and serving beverage...\r\n");
+            LED_SetColor(false, true, true); // Cian - Mezclando y sirviendo
+            
+            op_status = MixingServingFlow_Run();
+            
+            if (op_status == OP_COMPLETED) {
+                Debug_Printf("System: Mixing and serving completed!\r\n");
+                g_system_state = SYSTEM_STATE_WAITING_RESTART;
+                LED_SetColor(false, true, false); // Verde
+                
+                // RESTART: Reset op_status para el próximo ciclo
+                op_status = OP_IN_PROGRESS;
+            }
+            else if (op_status == OP_ERROR) {
+                Debug_Printf("ERROR: Mixing and serving failed!\r\n");
+                LED_SetColor(true, false, false); // Rojo
+                g_system_state = SYSTEM_STATE_ERROR;
+            }
+            break;
+
         case SYSTEM_STATE_WAITING_RESTART:
-            Debug_Printf("System: Cycle completed. Restarting in 3 seconds...\r\n");
+            Debug_Printf("System: Complete cycle finished. Restarting in 3 seconds...\r\n");
             LED_SetColor(false, true, false); // Verde
-            Delay(1000);
+            Delay(3000);
             g_system_state = SYSTEM_STATE_SENSOR_CHECK;
             
             // RESTART: Preparar el flujo de sensores para el nuevo ciclo
@@ -156,6 +181,7 @@ void SystemController_Run(void) {
             StartupFlow_Restart();
             SensorCheckFlow_Restart();
             BeverageSelectFlow_Restart();
+            MixingServingFlow_Restart();
             
             // Reiniciar desde el chequeo de sensores
             g_system_state = SYSTEM_STATE_SENSOR_CHECK;
@@ -172,16 +198,16 @@ int main(void) {
     BOARD_InitAll();
     
     // Mensaje inicial
-    Debug_Printf("\r\n\r\n=== Robo-Bar System (Simplified) ===\r\n");
+    Debug_Printf("\r\n\r\n=== Robo-Bar System (Complete with Mixing/Serving) ===\r\n");
     Debug_Printf("System Initialized. Starting main loop...\r\n");
+    Debug_Printf("Flow sequence: Startup -> Sensors -> Beverage Selection -> Mixing/Serving -> Restart\r\n");
     
     // LED inicial - Amarillo para indicar inicialización
     LED_SetColor(true, true, false);
     
     // Bucle principal
     while (1) {
-
-    	SystemController_Run();
+        SystemController_Run();
         Delay(100); // Pequeño delay para estabilidad
     }
 }
