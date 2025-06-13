@@ -1,10 +1,9 @@
 /*
  * sensor_check_flow.h
- * 
+ *
  * Sensor Check and Mode Selection Flow Controller Header (MODIFIED for 3 sensors)
  * FRDM-KL25Z Development Board
  */
-
 #ifndef SENSOR_CHECK_FLOW_H
 #define SENSOR_CHECK_FLOW_H
 
@@ -85,6 +84,6 @@ const char* SensorCheckFlow_StateToString(sensor_check_flow_state_t state);
  * Constants
  ******************************************************************************/
 #define SENSOR_COUNT                3U      /* Total number of sensors */
-#define MIN_SENSORS_TO_OPERATE      2U      /* Minimum sensors needed to operate */
+#define MIN_SENSORS_TO_OPERATE      1U      /* Minimum sensors needed to operate - MODIFICADO */
 
 #endif /* SENSOR_CHECK_FLOW_H */

@@ -191,13 +191,15 @@ bool SensorCheckFlow_CheckSensors(void) {
     if (!g_sensor_check_flow.sensor_status.sensor_2_ok) g_sensor_check_flow.sensor_status.low_sensors |= (1 << 1);
     if (!g_sensor_check_flow.sensor_status.sensor_3_ok) g_sensor_check_flow.sensor_status.low_sensors |= (1 << 2);
     
-    // Check if system can operate (at least 2 sensors OK for 3 sensor system)
+    // Check if system can operate - MODIFICADO: solo error crítico si TODOS los sensores están en bajo
     uint8_t ok_count = 0;
     if (g_sensor_check_flow.sensor_status.sensor_1_ok) ok_count++;
     if (g_sensor_check_flow.sensor_status.sensor_2_ok) ok_count++;
     if (g_sensor_check_flow.sensor_status.sensor_3_ok) ok_count++;
     
-    g_sensor_check_flow.sensor_status.can_operate = (ok_count >= 2);
+    // CAMBIO PRINCIPAL: El sistema puede operar mientras tenga al menos 1 sensor OK
+    // Solo error crítico cuando ok_count == 0 (todos los sensores en bajo)
+    g_sensor_check_flow.sensor_status.can_operate = (ok_count >= 1);
     
     Debug_Printf("SensorCheckFlow: Sensor check complete - OK:%d, Low:%02X, CanOperate:%d\r\n", 
                  ok_count, g_sensor_check_flow.sensor_status.low_sensors, g_sensor_check_flow.sensor_status.can_operate);
@@ -216,6 +218,7 @@ void SensorCheckFlow_ShowSensorError(const sensor_status_t* sensor_status) {
     lcd_clear();
     
     if (sensor_status->can_operate) {
+        // Caso: algunos sensores están bajos pero al menos 1 está OK
         lcd_set_cursor(0, 0);
         lcd_print("Niveles bajos:");
         
@@ -236,14 +239,15 @@ void SensorCheckFlow_ShowSensorError(const sensor_status_t* sensor_status) {
         lcd_print(low_sensors_str);
         Debug_Printf("SensorCheckFlow: Showing sensor error - Low sensors: %s\r\n", low_sensors_str);
         
-        Delay(3000);
+        Delay(1000);
     } else {
+        // Caso: ERROR CRÍTICO - TODOS los sensores están en bajo (0 sensores OK)
         lcd_set_cursor(0, 0);
         lcd_print("ERROR CRITICO:");
         lcd_set_cursor(1, 0);
-        lcd_print("Poco liquido");
-        Debug_Printf("SensorCheckFlow: Critical error - insufficient liquids\r\n");
-        Delay(3000);
+        lcd_print("Sin liquidos");
+        Debug_Printf("SensorCheckFlow: Critical error - NO liquids available (all sensors low)\r\n");
+        Delay(1000);
     }
 }
 
