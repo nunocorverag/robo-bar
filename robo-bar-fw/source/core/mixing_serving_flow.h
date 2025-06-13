@@ -79,37 +79,64 @@ void MixingServingFlow_SetConfig(uint16_t mixing_time_ms, uint16_t serving_time_
 void MixingServingFlow_Restart(void);
 
 /*******************************************************************************
- * Hardware Control Functions
+ * Hardware Control Functions - Motor Relay (Mixing)
  ******************************************************************************/
 
 /**
- * @brief Initialize relay for mixing motor (PTE31)
+ * @brief Initialize motor relay for mixing (PTE31)
+ */
+void MOTOR_RELAY_Init(void);
+
+/**
+ * @brief Turn on motor relay (activate mixer)
+ */
+void MOTOR_RELAY_On(void);
+
+/**
+ * @brief Turn off motor relay (deactivate mixer)
+ */
+void MOTOR_RELAY_Off(void);
+
+/*******************************************************************************
+ * Hardware Control Functions - Dispenser Relay (Serving)
+ ******************************************************************************/
+
+/**
+ * @brief Initialize dispenser relay for serving (PTE23)
+ */
+void DISPENSER_RELAY_Init(void);
+
+/**
+ * @brief Turn on dispenser relay (activate dispenser)
+ */
+void DISPENSER_RELAY_On(void);
+
+/**
+ * @brief Turn off dispenser relay (deactivate dispenser)
+ */
+void DISPENSER_RELAY_Off(void);
+
+/*******************************************************************************
+ * Legacy Hardware Control Functions (for backward compatibility)
+ ******************************************************************************/
+
+/**
+ * @brief Initialize relay for mixing motor (PTE31) - Legacy function
  */
 void RELAY_Init(void);
 
 /**
- * @brief Turn on relay (activate mixer)
+ * @brief Turn on relay (activate mixer) - Legacy function
  */
 void RELAY_On(void);
 
 /**
- * @brief Turn off relay (deactivate mixer)
+ * @brief Turn off relay (deactivate mixer) - Legacy function
  */
 void RELAY_Off(void);
 
 /**
- * @brief Initialize servo 5 for serving (PTD0)
- */
-void servo5_init(void);
-
-/**
- * @brief Set servo 5 angle
- * @param angle Angle in degrees (0-180)
- */
-void servo5_set_angle(uint16_t angle);
-
-/**
- * @brief Serve beverage using servo 5
+ * @brief Serve beverage using dispenser relay
  */
 void ServirBebida(void);
 

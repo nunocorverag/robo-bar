@@ -37,37 +37,34 @@
 #define LED_BLUE_PIN        1U
 
 /*******************************************************************************
- * Servo Motor Control (PWM Pins)
+ * Relay Control for Pumps and Dispenser
  ******************************************************************************/
-/* 6 Servo motors for liquid dispensing */
-#define SERVO_1_PORT        PORTD
-#define SERVO_1_GPIO        GPIOD
-#define SERVO_1_PIN         4U
-#define SERVO_1_PWM         TPM0_CH4
+/* 3 Ingredient Pump Relays */
+#define PUMP_RELAY_1_PORT      PORTE
+#define PUMP_RELAY_1_GPIO      GPIOE
+#define PUMP_RELAY_1_PIN       20U
 
-#define SERVO_2_PORT        PORTA
-#define SERVO_2_GPIO        GPIOA
-#define SERVO_2_PIN         12U
-#define SERVO_2_PWM         TPM1_CH0
+#define PUMP_RELAY_2_PORT      PORTE
+#define PUMP_RELAY_2_GPIO      GPIOE
+#define PUMP_RELAY_2_PIN       21U
 
-#define SERVO_3_PORT        PORTA
-#define SERVO_3_GPIO        GPIOA
-#define SERVO_3_PIN         13U
-#define SERVO_3_PWM         TPM1_CH1
+#define PUMP_RELAY_3_PORT      PORTE
+#define PUMP_RELAY_3_GPIO      GPIOE
+#define PUMP_RELAY_3_PIN       22U
 
-#define SERVO_4_PORT        PORTD
-#define SERVO_4_GPIO        GPIOD
-#define SERVO_4_PIN         5U
-#define SERVO_4_PWM         TPM0_CH5
+#define PUMP_RELAY_PORT_CLK SIM_SCGC5_PORTE_MASK
 
-/* 360° Direction control servo */
-#define DIRECTION_SERVO_PORT    PORTD
-#define DIRECTION_SERVO_GPIO    GPIOD
-#define DIRECTION_SERVO_PIN     6U
-#define DIRECTION_SERVO_PWM     TPM0_CH6
+#define MOTOR_RELAY_PIN 31          // PTE31 - Relé para motor de mezclado
+#define MOTOR_RELAY_PORT_CLK SIM_SCGC5_PORTE_MASK
+
+/* 1 Dispenser Relay */
+#define DISPENSER_RELAY_PIN 23      // PTE23 - Relé para dispensador
+#define DISPENSER_RELAY_PORT_CLK SIM_SCGC5_PORTE_MASK
+#define DISPENSER_RELAY_PORT   PORTE
+#define DISPENSER_RELAY_GPIO   GPIOE
 
 /*******************************************************************************
- * Water Level Sensors (Digital/Analog Inputs)
+ * Water Level Sensors (Digital/Analog Inputs) - REDUCED TO 3 SENSORS
  ******************************************************************************/
 #define SENSOR_1_PORT       PORTC
 #define SENSOR_1_GPIO       GPIOC
@@ -81,9 +78,7 @@
 #define SENSOR_3_GPIO       GPIOC
 #define SENSOR_3_PIN        3U
 
-#define SENSOR_4_PORT       PORTC
-#define SENSOR_4_GPIO       GPIOC
-#define SENSOR_4_PIN        4U
+/* SENSOR_4 REMOVED - Pin PORTC4 now available for other uses */
 
 /*******************************************************************************
  * H-Bridge Motor Control
@@ -182,24 +177,29 @@ typedef struct {
 /*******************************************************************************
  * Pin Arrays for Easy Initialization
  ******************************************************************************/
-extern const gpio_pin_config_extended_t servo_pins[SERVO_COUNT];
 extern const gpio_input_config_t sensor_pins[WATER_LEVEL_SENSORS_COUNT];
 extern const gpio_pin_config_extended_t motor_control_pins[];
 extern const gpio_pin_config_extended_t keypad_row_pins[KEYPAD_ROWS];
 extern const gpio_input_config_t keypad_col_pins[KEYPAD_COLS];
 extern const gpio_pin_config_extended_t status_led_pins[3];
 
+extern const gpio_pin_config_extended_t pump_relay_pins[PUMP_RELAY_COUNT];
+extern const gpio_pin_config_extended_t dispenser_relay_pins[DISPENSER_RELAY_COUNT];
 /*******************************************************************************
  * Function Prototypes
  ******************************************************************************/
 void gpio_config_init_all(void);
 void gpio_config_init_leds(void);
-void gpio_config_init_servos(void);
+void gpio_config_init_pump_relays(void);
+void gpio_config_init_dispenser_relay(void);
 void gpio_config_init_sensors(void);
 void gpio_config_init_motors(void);
 void gpio_config_init_keypad(void);
 void gpio_config_init_lcd_i2c(void);
 void gpio_config_init_emergency_stop(void);
+void gpio_pump_relay_set(uint8_t pump_index, bool state);
+void gpio_dispenser_relay_set(bool state);
+void gpio_all_relays_off(void);
 
 /* LED control functions */
 void gpio_led_set(uint8_t led_index, bool state);
@@ -235,17 +235,10 @@ void gpio_pin_toggle(GPIO_Type *gpio, uint32_t pin);
 #define LED_GREEN_INDEX     1
 #define LED_BLUE_INDEX      2
 
-/* Servo indices */
-#define SERVO_1_INDEX       0
-#define SERVO_2_INDEX       1
-#define SERVO_3_INDEX       2
-#define SERVO_4_INDEX       3
-#define DIRECTION_SERVO_INDEX 6
-
 /* Sensor indices */
 #define WATER_SENSOR_1_INDEX    0
 #define WATER_SENSOR_2_INDEX    1
 #define WATER_SENSOR_3_INDEX    2
-#define WATER_SENSOR_4_INDEX    3
+/* WATER_SENSOR_4_INDEX removed */
 
 #endif /* GPIO_CONFIG_H */

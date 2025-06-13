@@ -20,18 +20,6 @@ extern void LED_SetColor(bool red, bool green, bool blue);
 extern void Delay(uint32_t ms);
 
 /*******************************************************************************
- * Hardware Definitions
- ******************************************************************************/
-#define RELAY_PIN 31 // PTE31
-#define RELAY_PORT_CLK SIM_SCGC5_PORTE_MASK
-
-// Configuración PWM para servo
-#define PWM_MOD 20833
-#define SERVO_MIN_PULSE 1041    // 0° - Válvula cerrada
-#define SERVO_MAX_PULSE 4167    // 180° - Válvula abierta
-#define SERVO_90_PULSE 2604     // 90° - Posición intermedia
-
-/*******************************************************************************
  * Private Variables
  ******************************************************************************/
 static mixing_serving_flow_t g_mixing_serving_flow;
@@ -57,12 +45,12 @@ operation_status_t MixingServingFlow_Run(void) {
     MixingServingFlow_ShowMixingScreen();
     
     // Iniciar mezclado
-    RELAY_On();
+    MOTOR_RELAY_On();
     Debug_Printf("MixingServingFlow: Mixing for %d ms...\r\n", g_mixing_serving_flow.config.mixing_time_ms);
     Delay(g_mixing_serving_flow.config.mixing_time_ms);
     
     // Detener mezclado
-    RELAY_Off();
+    MOTOR_RELAY_Off();
     Debug_Printf("MixingServingFlow: Mixing complete\r\n");
     
     // Pausa entre mezclado y servido
@@ -75,12 +63,12 @@ operation_status_t MixingServingFlow_Run(void) {
     LED_SetColor(true, false, true);  // LED magenta para servido
     MixingServingFlow_ShowServingScreen();
     
-    servo5_set_angle(180);  // Abrir válvula
+    DISPENSER_RELAY_On();  // Activar dispensador
     Debug_Printf("MixingServingFlow: Serving for %d ms...\r\n", g_mixing_serving_flow.config.serving_time_ms);
     Delay(g_mixing_serving_flow.config.serving_time_ms);
     
-    // Cerrar válvula
-    servo5_set_angle(0);
+    // Detener dispensador
+    DISPENSER_RELAY_Off();
     Debug_Printf("MixingServingFlow: Serving complete\r\n");
     
     // Mostrar pantalla de finalización
@@ -104,8 +92,8 @@ bool MixingServingFlow_Init(void) {
     MixingServingFlow_SetConfig(5000, 5000, 5000); // 5s mixing, 5s serving, 5s pause
     
     // Initialize hardware
-    RELAY_Init();
-    servo5_init();
+    MOTOR_RELAY_Init();
+    DISPENSER_RELAY_Init();
     
     g_mixing_serving_flow.flow_initialized = true;
     Debug_Printf("MixingServingFlow: Initialization complete\r\n");
@@ -143,8 +131,8 @@ void MixingServingFlow_Restart(void) {
     Debug_Printf("MixingServingFlow: Restarting flow...\r\n");
     
     // Ensure hardware is safe
-    RELAY_Off();
-    servo5_set_angle(0);
+    MOTOR_RELAY_Off();
+    DISPENSER_RELAY_Off();
     
     // Reset state
     g_mixing_serving_flow.current_state = MIXING_SERVING_STATE_INIT;
@@ -154,74 +142,77 @@ void MixingServingFlow_Restart(void) {
 }
 
 /*******************************************************************************
- * Hardware Control Functions
+ * Hardware Control Functions - Motor Relay
  ******************************************************************************/
 
-void RELAY_Init(void) {
-    SIM->SCGC5 |= RELAY_PORT_CLK;
-    PORTE->PCR[RELAY_PIN] = PORT_PCR_MUX(1) | PORT_PCR_DSE_MASK;
-    GPIOE->PDDR |= (1U << RELAY_PIN);
-    GPIOE->PCOR = (1U << RELAY_PIN); // Relé apagado al inicio (lógica inversa)
+void MOTOR_RELAY_Init(void) {
+    SIM->SCGC5 |= MOTOR_RELAY_PORT_CLK;
+    PORTE->PCR[MOTOR_RELAY_PIN] = PORT_PCR_MUX(1) | PORT_PCR_DSE_MASK;
+    GPIOE->PDDR |= (1U << MOTOR_RELAY_PIN);
+    GPIOE->PCOR = (1U << MOTOR_RELAY_PIN); // Relé apagado al inicio
     
-    Debug_Printf("MixingServingFlow: Relay initialized (PTE31)\r\n");
+    Debug_Printf("MixingServingFlow: Motor Relay initialized (PTE31)\r\n");
+}
+
+void MOTOR_RELAY_On(void) {
+    GPIOE->PSOR = (1U << MOTOR_RELAY_PIN); // Relé ON para motor de mezclado
+    Debug_Printf("MixingServingFlow: Motor Relay ON (mixing started)\r\n");
+}
+
+void MOTOR_RELAY_Off(void) {
+    GPIOE->PCOR = (1U << MOTOR_RELAY_PIN); // Relé OFF para motor de mezclado
+    Debug_Printf("MixingServingFlow: Motor Relay OFF (mixing stopped)\r\n");
+}
+
+/*******************************************************************************
+ * Hardware Control Functions - Dispenser Relay
+ ******************************************************************************/
+
+void DISPENSER_RELAY_Init(void) {
+    SIM->SCGC5 |= DISPENSER_RELAY_PORT_CLK;
+    PORTE->PCR[DISPENSER_RELAY_PIN] = PORT_PCR_MUX(1) | PORT_PCR_DSE_MASK;
+    GPIOE->PDDR |= (1U << DISPENSER_RELAY_PIN);
+    GPIOE->PCOR = (1U << DISPENSER_RELAY_PIN); // Relé apagado al inicio
+    
+    Debug_Printf("MixingServingFlow: Dispenser Relay initialized (PTE23)\r\n");
+}
+
+void DISPENSER_RELAY_On(void) {
+    GPIOE->PSOR = (1U << DISPENSER_RELAY_PIN); // Relé ON para dispensador
+    Debug_Printf("MixingServingFlow: Dispenser Relay ON (serving started)\r\n");
+}
+
+void DISPENSER_RELAY_Off(void) {
+    GPIOE->PCOR = (1U << DISPENSER_RELAY_PIN); // Relé OFF para dispensador
+    Debug_Printf("MixingServingFlow: Dispenser Relay OFF (serving stopped)\r\n");
+}
+
+/*******************************************************************************
+ * Legacy Functions - Mantener compatibilidad
+ ******************************************************************************/
+
+// Mantener las funciones RELAY_* para compatibilidad con código existente
+void RELAY_Init(void) {
+    MOTOR_RELAY_Init();
 }
 
 void RELAY_On(void) {
-    GPIOE->PSOR = (1U << RELAY_PIN); // Relé ON (lógica inversa - HIGH activa)
-    Debug_Printf("MixingServingFlow: Relay ON (mixing started)\r\n");
+    MOTOR_RELAY_On();
 }
 
 void RELAY_Off(void) {
-    GPIOE->PCOR = (1U << RELAY_PIN); // Relé OFF (lógica inversa - LOW desactiva)
-    Debug_Printf("MixingServingFlow: Relay OFF (mixing stopped)\r\n");
-}
-
-void servo5_init(void) {
-    // Habilitar relojes para puerto D y TPM0
-    SIM->SCGC5 |= SIM_SCGC5_PORTD_MASK;
-    SIM->SCGC6 |= SIM_SCGC6_TPM0_MASK;
-    SIM->SOPT2 |= SIM_SOPT2_TPMSRC(1); // TPM usa MCGFLLCLK (48 MHz)
-    
-    // Configurar PTD0 como TPM0_CH0 para servo 5
-    PORTD->PCR[0] = PORT_PCR_MUX(4); // PTD0 → TPM0_CH0
-    
-    // Configurar TPM0 para CH0 (servo 5)
-    TPM0->SC = 0; // Detener TPM0
-    TPM0->MOD = PWM_MOD; // Período de 20ms
-    TPM0->CONTROLS[0].CnSC = TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK; // PWM modo edge-aligned
-    TPM0->CONTROLS[0].CnV = SERVO_MIN_PULSE; // Iniciar en 0° (válvula cerrada)
-    TPM0->SC = TPM_SC_PS(4) | TPM_SC_CMOD(1); // Prescaler /16, iniciar TPM
-    
-    Debug_Printf("MixingServingFlow: Servo 5 initialized (PTD0)\r\n");
-}
-
-void servo5_set_angle(uint16_t angle) {
-    uint16_t pulse;
-    
-    if (angle == 0) {
-        pulse = SERVO_MIN_PULSE;    // 0° - Válvula cerrada
-    } else if (angle == 90) {
-        pulse = SERVO_90_PULSE;     // 90° - Posición intermedia
-    } else if (angle == 180) {
-        pulse = SERVO_MAX_PULSE;    // 180° - Válvula abierta
-    } else {
-        // Interpolación lineal para ángulos intermedios
-        pulse = SERVO_MIN_PULSE + ((SERVO_MAX_PULSE - SERVO_MIN_PULSE) * angle) / 180;
-    }
-    
-    TPM0->CONTROLS[0].CnV = pulse;
-    Debug_Printf("MixingServingFlow: Servo 5 set to %d degrees\r\n", angle);
+    MOTOR_RELAY_Off();
 }
 
 void ServirBebida(void) {
-    // Abrir válvula completamente (servo 5 en PTD0)
-    servo5_set_angle(180);
-    Delay(150); // Tiempo de dispensado
+    // Activar dispensador por tiempo definido
+    DISPENSER_RELAY_On();
+    Delay(g_mixing_serving_flow.config.serving_time_ms); 
     
-    // Cerrar válvula completamente
-    servo5_set_angle(0);
+    // Desactivar dispensador
+    DISPENSER_RELAY_Off();
     
-    Debug_Printf("MixingServingFlow: Beverage served\r\n");
+    Debug_Printf("MixingServingFlow: Beverage served using dispenser relay\r\n");
 }
 
 /*******************************************************************************

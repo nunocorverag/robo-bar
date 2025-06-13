@@ -1,13 +1,11 @@
 /*
  * system_config.h
- * 
+ *
  * System-wide configuration definitions for Robo-Bar project
  * FRDM-KL25Z Development Board
  */
-
 #ifndef SYSTEM_CONFIG_H
 #define SYSTEM_CONFIG_H
-
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -31,10 +29,8 @@
 /*******************************************************************************
  * System Components Configuration
  ******************************************************************************/
-
 /* Liquid Dispensing System */
-#define SERVO_COUNT                 4U           /* Number of servo motors */
-#define WATER_LEVEL_SENSORS_COUNT   4U           /* Number of level sensors */
+#define WATER_LEVEL_SENSORS_COUNT   3U           /* Number of level sensors - REDUCED TO 3 */
 #define MAX_DISPENSE_TIME_MS        5000U        /* Maximum dispense time */
 
 /* User Interface */
@@ -43,14 +39,13 @@
 
 /* Motor Control */
 #define MIXING_MOTOR_COUNT          1U
-#define DIRECTION_SERVO_COUNT       1U           /* 360° servo */
 
-/* Timing Configuration */
-#define SERVO_PWM_FREQUENCY_HZ      50U          /* Standard servo PWM frequency */
-#define SERVO_PWM_PERIOD_US         20000U       /* 20ms period */
-#define SERVO_PULSE_MIN_US          1000U        /* 1ms minimum pulse */
-#define SERVO_PULSE_MAX_US          2000U        /* 2ms maximum pulse */
-#define SERVO_PULSE_NEUTRAL_US      1500U        /* 1.5ms neutral pulse */
+/* Liquid Dispensing System - Relay-based */
+#define PUMP_RELAY_COUNT           3U           /* Number of ingredient pump relays */
+#define DISPENSER_RELAY_COUNT      1U           /* Number of dispenser relays */
+#define TOTAL_RELAY_COUNT          4U           /* Total relays (3 pumps + 1 dispenser) */
+#define MAX_PUMP_TIME_MS           5000U        /* Maximum pump activation time */
+#define WATER_LEVEL_SENSORS_COUNT  3U           /* Number of level sensors */
 
 /*******************************************************************************
  * Debug and Monitoring Configuration

@@ -1,7 +1,7 @@
 /*
  * sensor_check_flow.c
  * 
- * Sensor Check and Mode Selection Flow Controller Implementation (MODIFIED)
+ * Sensor Check and Mode Selection Flow Controller Implementation (MODIFIED for 3 sensors)
  * FRDM-KL25Z Development Board
  */
 
@@ -23,7 +23,7 @@ extern void Delay(uint32_t ms);
  * Private Variables
  ******************************************************************************/
 static sensor_check_flow_t g_sensor_check_flow;
-static const char* SENSOR_NAMES[4] = {"Liquido 1", "Liquido 2", "Liquido 3", "Liquido 4"};
+static const char* SENSOR_NAMES[3] = {"Liquido 1", "Liquido 2", "Liquido 3"};
 
 /*******************************************************************************
  * Private Function Prototypes
@@ -40,7 +40,7 @@ operation_status_t SensorCheckFlow_Run(void) {
         if (!SensorCheckFlow_Init()) {
             SensorCheckFlow_ShowError("Init falló");
             LED_SetColor(true, false, false);  // LED rojo
-            return OP_ERROR;  // Retornamos OP_ERROR si la inicialización falla
+            return OP_ERROR;
         }
     }
 
@@ -49,13 +49,13 @@ operation_status_t SensorCheckFlow_Run(void) {
 
     // Ejecutar el flujo de verificación de sensores paso a paso
     while (result == OP_IN_PROGRESS) {
-        result = SensorCheckFlow_Execute();  // Ejecuta paso por paso
+        result = SensorCheckFlow_Execute();
 
         if (result == OP_ERROR) {
             SensorCheckFlow_ShowError("Error ejecución");
             LED_SetColor(true, false, false);  // LED rojo
             Debug_Printf("SensorCheckFlow: Failed with error\r\n");
-            break;  // Si hay error, salimos del bucle
+            break;
         }
     }
 
@@ -65,7 +65,7 @@ operation_status_t SensorCheckFlow_Run(void) {
         Debug_Printf("SensorCheckFlow: Completed successfully\r\n");
     }
 
-    return result;  // Retorna el estado de la operación (ya sea OP_COMPLETED o OP_ERROR)
+    return result;
 }
 
 bool SensorCheckFlow_Init(void) {
@@ -102,8 +102,8 @@ operation_status_t SensorCheckFlow_Execute(void) {
             if (g_sensor_check_flow.sensor_status.can_operate) {
                 g_sensor_check_flow.current_state = SENSOR_CHECK_STATE_MODE_SELECTION;
             } else {
-                SensorCheckFlow_ShowRefillInstructions();  // Instrucciones de recarga
-                g_sensor_check_flow.current_state = SENSOR_CHECK_STATE_WAITING_REFILL;  // Estado de espera para relleno
+                SensorCheckFlow_ShowRefillInstructions();
+                g_sensor_check_flow.current_state = SENSOR_CHECK_STATE_WAITING_REFILL;
             }
             break;
             
@@ -115,7 +115,6 @@ operation_status_t SensorCheckFlow_Execute(void) {
             } else if (g_sensor_check_flow.selected_mode == OPERATION_MODE_REFILL) {
                 g_sensor_check_flow.current_state = SENSOR_CHECK_STATE_REFILL_MODE;
             } else {
-                // Invalid selection, return error
                 g_sensor_check_flow.current_state = SENSOR_CHECK_STATE_ERROR;
                 return OP_ERROR;
             }
@@ -129,7 +128,6 @@ operation_status_t SensorCheckFlow_Execute(void) {
             
         case SENSOR_CHECK_STATE_WAITING_REFILL:
             Debug_Printf("SensorCheckFlow: Waiting for refill completion...\r\n");
-            // Wait for # key press (handled in ShowRefillInstructions)
             g_sensor_check_flow.current_state = SENSOR_CHECK_STATE_RECHECK_SENSORS;
             break;
             
@@ -173,9 +171,9 @@ bool SensorCheckFlow_CheckSensors(void) {
     }
     
     lcd_clear();
-    lcd_set_cursor(0, 0);  // Primera línea
+    lcd_set_cursor(0, 0);
     lcd_print("Verificando...");
-    lcd_set_cursor(1, 0);  // Segunda línea
+    lcd_set_cursor(1, 0);
     lcd_print("Sensores");
     
     Debug_Printf("SensorCheckFlow: Checking sensors...\r\n");
@@ -183,31 +181,28 @@ bool SensorCheckFlow_CheckSensors(void) {
     // Reset sensor status
     memset(&g_sensor_check_flow.sensor_status, 0, sizeof(sensor_status_t));
     
-    // Check each sensor
+    // Check each sensor (only 3 now)
     g_sensor_check_flow.sensor_status.sensor_1_ok = read_sensor(1);
     g_sensor_check_flow.sensor_status.sensor_2_ok = read_sensor(2);
     g_sensor_check_flow.sensor_status.sensor_3_ok = read_sensor(3);
-    g_sensor_check_flow.sensor_status.sensor_4_ok = read_sensor(4);
     
-    // Create bitmask of low sensors
+    // Create bitmask of low sensors (only 3 bits used)
     if (!g_sensor_check_flow.sensor_status.sensor_1_ok) g_sensor_check_flow.sensor_status.low_sensors |= (1 << 0);
     if (!g_sensor_check_flow.sensor_status.sensor_2_ok) g_sensor_check_flow.sensor_status.low_sensors |= (1 << 1);
     if (!g_sensor_check_flow.sensor_status.sensor_3_ok) g_sensor_check_flow.sensor_status.low_sensors |= (1 << 2);
-    if (!g_sensor_check_flow.sensor_status.sensor_4_ok) g_sensor_check_flow.sensor_status.low_sensors |= (1 << 3);
     
-    // Check if system can operate (at least 2 sensors OK)
+    // Check if system can operate (at least 2 sensors OK for 3 sensor system)
     uint8_t ok_count = 0;
     if (g_sensor_check_flow.sensor_status.sensor_1_ok) ok_count++;
     if (g_sensor_check_flow.sensor_status.sensor_2_ok) ok_count++;
     if (g_sensor_check_flow.sensor_status.sensor_3_ok) ok_count++;
-    if (g_sensor_check_flow.sensor_status.sensor_4_ok) ok_count++;
     
     g_sensor_check_flow.sensor_status.can_operate = (ok_count >= 2);
     
     Debug_Printf("SensorCheckFlow: Sensor check complete - OK:%d, Low:%02X, CanOperate:%d\r\n", 
                  ok_count, g_sensor_check_flow.sensor_status.low_sensors, g_sensor_check_flow.sensor_status.can_operate);
     
-    Delay(1000);  // Show checking message
+    Delay(1000);
     
     return (g_sensor_check_flow.sensor_status.low_sensors == 0);
 }
@@ -221,31 +216,31 @@ void SensorCheckFlow_ShowSensorError(const sensor_status_t* sensor_status) {
     lcd_clear();
     
     if (sensor_status->can_operate) {
-        lcd_set_cursor(0, 0);  // Primera línea
+        lcd_set_cursor(0, 0);
         lcd_print("Niveles bajos:");
         
-        // Show which sensors are low
+        // Show which sensors are low (only check first 3)
         char low_sensors_str[17] = {0};
         int pos = 0;
         
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 3; i++) {
             if (sensor_status->low_sensors & (1 << i)) {
                 if (pos > 0) {
                     low_sensors_str[pos++] = ',';
                 }
-                low_sensors_str[pos++] = '1' + i;  // Sensor numbers 1-4
+                low_sensors_str[pos++] = '1' + i;  // Sensor numbers 1-3
             }
         }
         
-        lcd_set_cursor(1, 0);  // Segunda línea
+        lcd_set_cursor(1, 0);
         lcd_print(low_sensors_str);
         Debug_Printf("SensorCheckFlow: Showing sensor error - Low sensors: %s\r\n", low_sensors_str);
         
-        Delay(3000);  // Show error for 3 seconds
+        Delay(3000);
     } else {
-        lcd_set_cursor(0, 0);  // Primera línea
+        lcd_set_cursor(0, 0);
         lcd_print("ERROR CRITICO:");
-        lcd_set_cursor(1, 0);  // Segunda línea
+        lcd_set_cursor(1, 0);
         lcd_print("Poco liquido");
         Debug_Printf("SensorCheckFlow: Critical error - insufficient liquids\r\n");
         Delay(3000);
@@ -255,7 +250,7 @@ void SensorCheckFlow_ShowSensorError(const sensor_status_t* sensor_status) {
 operation_mode_t SensorCheckFlow_SelectMode(void) {
     if (!lcd_is_initialized()) {
         Debug_Printf("SensorCheckFlow: LCD not initialized for mode selection\r\n");
-        return OPERATION_MODE_NORMAL;  // Default fallback
+        return OPERATION_MODE_NORMAL;
     }
     
     lcd_clear();
@@ -268,7 +263,7 @@ operation_mode_t SensorCheckFlow_SelectMode(void) {
 
     char key = '\0';
     while (key != '1' && key != '2') {
-        key = keypad_getkey();  // Espera una tecla
+        key = keypad_getkey();
         Debug_Printf("SensorCheckFlow: Key pressed: %c\r\n", key);
 
         if (key == '1') {
@@ -280,7 +275,7 @@ operation_mode_t SensorCheckFlow_SelectMode(void) {
         }
     }
 
-    return OPERATION_MODE_NORMAL;  // Fallback por defecto
+    return OPERATION_MODE_NORMAL;
 }
 
 void SensorCheckFlow_ShowRefillInstructions(void) {
@@ -290,16 +285,16 @@ void SensorCheckFlow_ShowRefillInstructions(void) {
     }
     
     lcd_clear();
-    lcd_set_cursor(0, 0);  // Primera línea
+    lcd_set_cursor(0, 0);
     lcd_print("Rellene faltantes");
-    lcd_set_cursor(1, 0);  // Segunda línea
+    lcd_set_cursor(1, 0);
     lcd_print("Presione #");
     
     Debug_Printf("SensorCheckFlow: Waiting for refill completion...\r\n");
     
     char key = '\0';
     while (key != '#') {
-        key = keypad_getkey();  // Espera la tecla presionada
+        key = keypad_getkey();
         Debug_Printf("SensorCheckFlow: Key pressed during refill: %c\r\n", key);
     }
     
@@ -312,17 +307,17 @@ void SensorCheckFlow_ShowReadyScreen(void) {
         return;
     }
     
-    lcd_clear();  // Limpiar la pantalla
-    lcd_set_cursor(0, 0);  // Establecer el cursor en la primera línea
-    lcd_print("Listo!");  // Mostrar el mensaje "Listo!" en la pantalla
-    lcd_set_cursor(1, 0);  // Establecer el cursor en la segunda línea
-    lcd_print("Presione *");  // Mostrar el mensaje "Presione *"
+    lcd_clear();
+    lcd_set_cursor(0, 0);
+    lcd_print("Listo!");
+    lcd_set_cursor(1, 0);
+    lcd_print("Presione *");
 
     Debug_Printf("SensorCheckFlow: System ready, waiting for start command...\r\n");
 
     char key = '\0';
     while (key != '*') {
-        key = keypad_getkey();  // Esperar a que se presione una tecla
+        key = keypad_getkey();
         Debug_Printf("SensorCheckFlow: Key pressed at ready screen: %c\r\n", key);
     }
 
@@ -404,9 +399,6 @@ static bool read_sensor(uint8_t sensor_id) {
         case 3:
             sensor_value = GPIO_ReadPinInput(SENSOR_3_GPIO, SENSOR_3_PIN);
             break;
-        case 4:
-            sensor_value = GPIO_ReadPinInput(SENSOR_4_GPIO, SENSOR_4_PIN);
-            break;
         default:
             Debug_Printf("SensorCheckFlow: Invalid sensor ID: %d\r\n", sensor_id);
             return false;
@@ -423,7 +415,6 @@ void SensorCheckFlow_Restart(void) {
     Debug_Printf("SensorCheckFlow: Restarting flow...\r\n");
     
     // Reset solo el estado, pero mantener hardware_initialized = true
-    // para evitar reinicializar el hardware innecesariamente
     bool hw_init_status = g_sensor_check_flow.hardware_initialized;
     
     memset(&g_sensor_check_flow, 0, sizeof(sensor_check_flow_t));

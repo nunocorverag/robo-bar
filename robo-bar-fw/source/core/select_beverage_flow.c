@@ -3,13 +3,14 @@
  * 
  * Beverage Selection and Dispensing Flow Controller Implementation
  * FRDM-KL25Z Development Board
+ * Modified to use relays instead of servos for beverage dispensing
  */
 
 #include "select_beverage_flow.h"
 #include "../drivers/lcd_i2c.h"
 #include "../drivers/keypad.h"
-#include "../drivers/servo_control.h"
 #include "../config/gpio_config.h"
+#include "MKL25Z4.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -25,12 +26,12 @@ extern void Delay(uint32_t ms);
  ******************************************************************************/
 static beverage_select_flow_t g_beverage_select_flow;
 
-// Definición de recetas de bebidas
+// Definición de recetas de bebidas (modificada para 3 dispensadores con relés)
 static const receta_bebida_t recetas[] = {
-    { "Mojito",      {0, 1, 255, 255}, 1500 },
-    { "Margarita",   {2, 0, 255, 255}, 1200 },
-    { "Cuba Libre",  {3, 1, 2, 255},   1800 },
-    { "Vodka Tonic", {0, 2, 3, 1},     2000 },
+    { "Mojito",      {0, 255, 255}, 2000 },    // Solo dispensador 1
+    { "Margarita",   {1, 255, 255}, 1800 },    // Solo dispensador 2
+    { "Cuba Libre",  {0, 1, 255},   2500 },    // Dispensadores 1 y 2
+    { "Vodka Tonic", {2, 255, 255}, 2200 },    // Solo dispensador 3
 };
 
 #define NUM_BEBIDAS (sizeof(recetas)/sizeof(recetas[0]))
@@ -81,8 +82,8 @@ bool BeverageSelectFlow_Init(void) {
     g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_INIT;
     g_beverage_select_flow.flow_initialized = false;
     
-    // Initialize servo control
-    servo_control_init();
+    // Initialize relay control for beverage dispensers
+    BeverageRelays_Init();
     
     g_beverage_select_flow.flow_initialized = true;
     Debug_Printf("BeverageSelectFlow: Initialization complete\r\n");
@@ -156,6 +157,79 @@ operation_status_t BeverageSelectFlow_Execute(void) {
 }
 
 /*******************************************************************************
+ * Relay Control Functions for Beverage Dispensers
+ ******************************************************************************/
+
+void BeverageRelays_Init(void) {
+    // Habilitar reloj para puerto E
+    SIM->SCGC5 |= PUMP_RELAY_PORT_CLK;
+    
+    // Configurar pines como GPIO output
+    PORTE->PCR[PUMP_RELAY_1_PIN] = PORT_PCR_MUX(1) | PORT_PCR_DSE_MASK;
+    PORTE->PCR[PUMP_RELAY_2_PIN] = PORT_PCR_MUX(1) | PORT_PCR_DSE_MASK;
+    PORTE->PCR[PUMP_RELAY_3_PIN] = PORT_PCR_MUX(1) | PORT_PCR_DSE_MASK;
+    
+    // Configurar como outputs
+    GPIOE->PDDR |= (1U << PUMP_RELAY_1_PIN);
+    GPIOE->PDDR |= (1U << PUMP_RELAY_2_PIN);
+    GPIOE->PDDR |= (1U << PUMP_RELAY_3_PIN);
+    
+    // Inicializar todos los relés apagados (LOW)
+    GPIOE->PCOR = (1U << PUMP_RELAY_1_PIN);
+    GPIOE->PCOR = (1U << PUMP_RELAY_2_PIN);
+    GPIOE->PCOR = (1U << PUMP_RELAY_3_PIN);
+    
+    Debug_Printf("BeverageSelectFlow: Beverage relays initialized (PTE20, PTE21, PTE22)\r\n");
+}
+
+void BeverageRelay_On(uint8_t relay_index) {
+    switch (relay_index) {
+        case 0:
+            GPIOE->PSOR = (1U << PUMP_RELAY_1_PIN);
+            Debug_Printf("BeverageSelectFlow: Dispensador 1 ON (PTE20)\r\n");
+            break;
+        case 1:
+            GPIOE->PSOR = (1U << PUMP_RELAY_2_PIN);
+            Debug_Printf("BeverageSelectFlow: Dispensador 2 ON (PTE21)\r\n");
+            break;
+        case 2:
+            GPIOE->PSOR = (1U << PUMP_RELAY_3_PIN);
+            Debug_Printf("BeverageSelectFlow: Dispensador 3 ON (PTE22)\r\n");
+            break;
+        default:
+            Debug_Printf("BeverageSelectFlow: Invalid relay index %d\r\n", relay_index);
+            break;
+    }
+}
+
+void BeverageRelay_Off(uint8_t relay_index) {
+    switch (relay_index) {
+        case 0:
+            GPIOE->PCOR = (1U << PUMP_RELAY_1_PIN);
+            Debug_Printf("BeverageSelectFlow: Dispensador 1 OFF (PTE20)\r\n");
+            break;
+        case 1:
+            GPIOE->PCOR = (1U << PUMP_RELAY_2_PIN);
+            Debug_Printf("BeverageSelectFlow: Dispensador 2 OFF (PTE21)\r\n");
+            break;
+        case 2:
+            GPIOE->PCOR = (1U << PUMP_RELAY_3_PIN);
+            Debug_Printf("BeverageSelectFlow: Dispensador 3 OFF (PTE22)\r\n");
+            break;
+        default:
+            Debug_Printf("BeverageSelectFlow: Invalid relay index %d\r\n", relay_index);
+            break;
+    }
+}
+
+void BeverageRelays_AllOff(void) {
+    GPIOE->PCOR = (1U << PUMP_RELAY_1_PIN);
+    GPIOE->PCOR = (1U << PUMP_RELAY_2_PIN);
+    GPIOE->PCOR = (1U << PUMP_RELAY_3_PIN);
+    Debug_Printf("BeverageSelectFlow: All beverage dispensers OFF\r\n");
+}
+
+/*******************************************************************************
  * Screen Display Functions
  ******************************************************************************/
 
@@ -196,24 +270,19 @@ bool BeverageSelectFlow_DispenseBeverage(const receta_bebida_t* recipe) {
     
     Debug_Printf("BeverageSelectFlow: Dispensing %s for %d ms\r\n", recipe->nombre, recipe->tiempo_ms);
     
-    // Abrir válvulas (servos) según la receta
-    for (int i = 0; i < 4; i++) {
-        if (recipe->servos[i] < 4) {  // 255 indica servo inactivo
-            Debug_Printf("BeverageSelectFlow: Opening servo %d\r\n", recipe->servos[i]);
-            servo_control_set_angle(recipe->servos[i], 90);  // Abrir válvula
+    // Activar relés según la receta
+    for (int i = 0; i < 3; i++) {  // Solo 3 dispensadores
+        if (recipe->dispensadores[i] < 3) {  // 255 indica dispensador inactivo
+            Debug_Printf("BeverageSelectFlow: Activating dispensador %d\r\n", recipe->dispensadores[i]);
+            BeverageRelay_On(recipe->dispensadores[i]);
         }
     }
     
     // Esperar el tiempo especificado para dispensar
     Delay(recipe->tiempo_ms);
     
-    // Cerrar todas las válvulas
-    for (int i = 0; i < 4; i++) {
-        if (recipe->servos[i] < 4) {
-            Debug_Printf("BeverageSelectFlow: Closing servo %d\r\n", recipe->servos[i]);
-            servo_control_set_angle(recipe->servos[i], 0);   // Cerrar válvula
-        }
-    }
+    // Apagar todos los relés
+    BeverageRelays_AllOff();
     
     Debug_Printf("BeverageSelectFlow: Dispensing complete\r\n");
     return true;
@@ -242,7 +311,7 @@ void BeverageSelectFlow_ShowCompletionScreen(const char* beverage_name) {
     
     lcd_clear();
     lcd_set_cursor(0, 0);
-   lcd_print("Líquidos dispensados");
+    lcd_print("Líquidos dispensados");
     lcd_set_cursor(1, 0);
     lcd_print(beverage_name);
     
@@ -300,6 +369,9 @@ const receta_bebida_t* BeverageSelectFlow_GetRecipe(beverage_type_t beverage_typ
 
 void BeverageSelectFlow_Restart(void) {
     Debug_Printf("BeverageSelectFlow: Restarting flow...\r\n");
+    
+    // Asegurar que todos los relés estén apagados
+    BeverageRelays_AllOff();
     
     memset(&g_beverage_select_flow, 0, sizeof(beverage_select_flow_t));
     g_beverage_select_flow.current_state = BEVERAGE_SELECT_STATE_INIT;

@@ -1,3 +1,4 @@
+
 # Robo-Bar Project - Pinout and Connections (FRDM-KL25Z)
 
 Este documento lista todas las conexiones de pines usadas en el proyecto Robo-Bar en la placa FRDM-KL25Z.
@@ -14,15 +15,15 @@ Este documento lista todas las conexiones de pines usadas en el proyecto Robo-Ba
 
 ---
 
-## Servo Motors (PWM Outputs)
+## Relay Control for Pumps and Dispenser
 
-| Servo           | MCU Port | Pin Number | TPM Channel | Description                  |
-|-----------------|----------|------------|-------------|------------------------------|
-| Servo 1         | PORTD    | 4          | TPM0_CH4    | Liquid dispensing servo 1     |
-| Servo 2         | PORTA    | 12         | TPM1_CH0    | Liquid dispensing servo 2     |
-| Servo 3         | PORTA    | 13         | TPM1_CH1    | Liquid dispensing servo 3     |
-| Servo 4         | PORTD    | 5          | TPM0_CH5    | Liquid dispensing servo 4     |
-| Direction Servo | PORTD    | 0          | TPM0_CH0    | Servo to control direction    |
+| Relay            | MCU Port | Pin Number | Description             |
+|------------------|----------|------------|-------------------------|
+| Pump Relay 1     | PORTE    | 20         | Relay for ingredient pump 1 |
+| Pump Relay 2     | PORTE    | 21         | Relay for ingredient pump 2 |
+| Pump Relay 3     | PORTE    | 22         | Relay for ingredient pump 3 |
+| Motor Relay      | PORTE    | 31         | Relay for motor control (mixing) |
+| Dispenser Relay  | PORTE    | 23         | Relay for dispenser      |
 
 ---
 
@@ -33,7 +34,6 @@ Este documento lista todas las conexiones de pines usadas en el proyecto Robo-Ba
 | Sensor 1    | PORTC    | 1          | Water level sensor 1   |
 | Sensor 2    | PORTC    | 2          | Water level sensor 2   |
 | Sensor 3    | PORTC    | 3          | Water level sensor 3   |
-| Sensor 4    | PORTC    | 4          | Water level sensor 4   |
 
 ---
 
@@ -77,5 +77,3 @@ Este documento lista todas las conexiones de pines usadas en el proyecto Robo-Ba
 | Signal        | MCU Port | Pin Number | Description              |
 |---------------|----------|------------|--------------------------|
 | Motor Enable  | PORTE    | 31         | Relay control for motor  |
-
----

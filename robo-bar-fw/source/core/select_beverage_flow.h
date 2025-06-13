@@ -3,6 +3,7 @@
  * 
  * Beverage Selection and Dispensing Flow Controller
  * FRDM-KL25Z Development Board
+ * Modified to use relays instead of servos for beverage dispensing
  */
 
 #ifndef SELECT_BEVERAGE_FLOW_H
@@ -36,12 +37,12 @@ typedef enum {
 } beverage_type_t;
 
 /*******************************************************************************
- * Beverage Recipe Structure
+ * Beverage Recipe Structure (Modified for Relays)
  ******************************************************************************/
 typedef struct {
     const char* nombre;
-    uint8_t servos[4];       // Lista de servos activos (255 = inactivo)
-    uint16_t tiempo_ms;      // Tiempo de apertura de válvulas
+    uint8_t dispensadores[3];    // Lista de dispensadores activos (255 = inactivo)
+    uint16_t tiempo_ms;          // Tiempo de activación de relés
 } receta_bebida_t;
 
 /*******************************************************************************
@@ -77,6 +78,32 @@ bool BeverageSelectFlow_Init(void);
 operation_status_t BeverageSelectFlow_Execute(void);
 
 /*******************************************************************************
+ * Relay Control Functions for Beverage Dispensers
+ ******************************************************************************/
+
+/**
+ * @brief Initialize beverage dispenser relays (PTE20, PTE21, PTE22)
+ */
+void BeverageRelays_Init(void);
+
+/**
+ * @brief Turn on specific beverage dispenser relay
+ * @param relay_index Index of relay (0-2)
+ */
+void BeverageRelay_On(uint8_t relay_index);
+
+/**
+ * @brief Turn off specific beverage dispenser relay
+ * @param relay_index Index of relay (0-2)
+ */
+void BeverageRelay_Off(uint8_t relay_index);
+
+/**
+ * @brief Turn off all beverage dispenser relays
+ */
+void BeverageRelays_AllOff(void);
+
+/*******************************************************************************
  * Screen Display Functions
  ******************************************************************************/
 
@@ -87,7 +114,7 @@ operation_status_t BeverageSelectFlow_Execute(void);
 beverage_type_t BeverageSelectFlow_SelectBeverage(void);
 
 /**
- * @brief Execute beverage dispensing sequence
+ * @brief Execute beverage dispensing sequence using relays
  * @param recipe Pointer to beverage recipe
  * @return true if dispensing successful, false if error
  */
