@@ -3,6 +3,7 @@
  * 
  * Mixing and Serving Flow Controller Implementation
  * FRDM-KL25Z Development Board
+ * CORRECCIÓN: Dispenser relay funcionando correctamente
  */
 
 #include "mixing_serving_flow.h"
@@ -89,7 +90,7 @@ bool MixingServingFlow_Init(void) {
     g_mixing_serving_flow.flow_initialized = false;
     
     // Set default configuration
-    MixingServingFlow_SetConfig(5000, 5000, 5000); // 5s mixing, 5s serving, 5s pause
+    MixingServingFlow_SetConfig(2000, 3000, 500); // 5s mixing, 5s serving, 5s pause
     
     // Initialize hardware
     MOTOR_RELAY_Init();
@@ -146,73 +147,90 @@ void MixingServingFlow_Restart(void) {
  ******************************************************************************/
 
 void MOTOR_RELAY_Init(void) {
+    // Habilitar reloj para puerto E
     SIM->SCGC5 |= MOTOR_RELAY_PORT_CLK;
-    PORTE->PCR[MOTOR_RELAY_PIN] = PORT_PCR_MUX(1) | PORT_PCR_DSE_MASK;
-    GPIOE->PDDR |= (1U << MOTOR_RELAY_PIN);
-    GPIOE->PCOR = (1U << MOTOR_RELAY_PIN); // Relé apagado al inicio
     
-    Debug_Printf("MixingServingFlow: Motor Relay initialized (PTE31)\r\n");
+    // Configurar pin como GPIO output con drive strength
+    PORTE->PCR[MOTOR_RELAY_PIN] = PORT_PCR_MUX(1) | PORT_PCR_DSE_MASK;
+    
+    // Configurar como output
+    GPIOE->PDDR |= (1U << MOTOR_RELAY_PIN);
+    
+    // Inicializar apagado (LOW)
+    GPIOE->PCOR = (1U << MOTOR_RELAY_PIN);
+    
+    Debug_Printf("MixingServingFlow: Motor Relay initialized (PTE%d) - OFF\r\n", MOTOR_RELAY_PIN);
 }
 
 void MOTOR_RELAY_On(void) {
-    GPIOE->PSOR = (1U << MOTOR_RELAY_PIN); // Relé ON para motor de mezclado
-    Debug_Printf("MixingServingFlow: Motor Relay ON (mixing started)\r\n");
+    GPIOE->PSOR = (1U << MOTOR_RELAY_PIN); // HIGH = ON
+    Debug_Printf("MixingServingFlow: Motor Relay ON (PTE%d = HIGH)\r\n", MOTOR_RELAY_PIN);
 }
 
 void MOTOR_RELAY_Off(void) {
-    GPIOE->PCOR = (1U << MOTOR_RELAY_PIN); // Relé OFF para motor de mezclado
-    Debug_Printf("MixingServingFlow: Motor Relay OFF (mixing stopped)\r\n");
+    GPIOE->PCOR = (1U << MOTOR_RELAY_PIN); // LOW = OFF
+    Debug_Printf("MixingServingFlow: Motor Relay OFF (PTE%d = LOW)\r\n", MOTOR_RELAY_PIN);
 }
 
 /*******************************************************************************
- * Hardware Control Functions - Dispenser Relay
+ * Hardware Control Functions - Dispenser Relay - CORREGIDO
  ******************************************************************************/
 
 void DISPENSER_RELAY_Init(void) {
+    // Habilitar reloj para puerto E
     SIM->SCGC5 |= DISPENSER_RELAY_PORT_CLK;
-    PORTE->PCR[DISPENSER_RELAY_PIN] = PORT_PCR_MUX(1) | PORT_PCR_DSE_MASK;
-    GPIOE->PDDR |= (1U << DISPENSER_RELAY_PIN);
-    GPIOE->PCOR = (1U << DISPENSER_RELAY_PIN); // Relé apagado al inicio
     
-    Debug_Printf("MixingServingFlow: Dispenser Relay initialized (PTE23)\r\n");
+    // Configurar pin como GPIO output con drive strength
+    PORTE->PCR[DISPENSER_RELAY_PIN] = PORT_PCR_MUX(1) | PORT_PCR_DSE_MASK;
+    
+    // Configurar como output
+    GPIOE->PDDR |= (1U << DISPENSER_RELAY_PIN);
+    
+    // Inicializar apagado (LOW)
+    GPIOE->PCOR = (1U << DISPENSER_RELAY_PIN);
+    
+    Debug_Printf("MixingServingFlow: Dispenser Relay initialized (PTE%d) - OFF\r\n", DISPENSER_RELAY_PIN);
 }
 
 void DISPENSER_RELAY_On(void) {
-    GPIOE->PSOR = (1U << DISPENSER_RELAY_PIN); // Relé ON para dispensador
-    Debug_Printf("MixingServingFlow: Dispenser Relay ON (serving started)\r\n");
+    GPIOE->PSOR = (1U << DISPENSER_RELAY_PIN); // HIGH = ON
+    Debug_Printf("MixingServingFlow: Dispenser Relay ON (PTE%d = HIGH)\r\n", DISPENSER_RELAY_PIN);
 }
 
 void DISPENSER_RELAY_Off(void) {
-    GPIOE->PCOR = (1U << DISPENSER_RELAY_PIN); // Relé OFF para dispensador
-    Debug_Printf("MixingServingFlow: Dispenser Relay OFF (serving stopped)\r\n");
+    GPIOE->PCOR = (1U << DISPENSER_RELAY_PIN); // LOW = OFF
+    Debug_Printf("MixingServingFlow: Dispenser Relay OFF (PTE%d = LOW)\r\n", DISPENSER_RELAY_PIN);
 }
 
 /*******************************************************************************
  * Legacy Functions - Mantener compatibilidad
  ******************************************************************************/
 
-// Mantener las funciones RELAY_* para compatibilidad con código existente
 void RELAY_Init(void) {
     MOTOR_RELAY_Init();
+    Debug_Printf("MixingServingFlow: Legacy RELAY_Init called - Motor relay initialized\r\n");
 }
 
 void RELAY_On(void) {
     MOTOR_RELAY_On();
+    Debug_Printf("MixingServingFlow: Legacy RELAY_On called - Motor relay ON\r\n");
 }
 
 void RELAY_Off(void) {
     MOTOR_RELAY_Off();
+    Debug_Printf("MixingServingFlow: Legacy RELAY_Off called - Motor relay OFF\r\n");
 }
 
 void ServirBebida(void) {
     // Activar dispensador por tiempo definido
+    Debug_Printf("MixingServingFlow: ServirBebida called - Starting dispenser\r\n");
     DISPENSER_RELAY_On();
     Delay(g_mixing_serving_flow.config.serving_time_ms); 
     
     // Desactivar dispensador
     DISPENSER_RELAY_Off();
     
-    Debug_Printf("MixingServingFlow: Beverage served using dispenser relay\r\n");
+    Debug_Printf("MixingServingFlow: ServirBebida completed - Dispenser stopped\r\n");
 }
 
 /*******************************************************************************

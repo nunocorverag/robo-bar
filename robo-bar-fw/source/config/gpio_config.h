@@ -5,9 +5,8 @@
  * FRDM-KL25Z Development Board
  * 
  * Pin assignments for all system components:
- * - Servo motors (PWM)
- * - Sensors (Digital/Analog inputs)
- * - Motors (H-bridge control)
+ * - Relay control (Pumps and Dispenser)
+ * - Sensors (Digital inputs)
  * - User interface (Keypad, LCD)
  * - Status LEDs
  */
@@ -52,19 +51,23 @@
 #define PUMP_RELAY_3_GPIO      GPIOE
 #define PUMP_RELAY_3_PIN       22U
 
-#define PUMP_RELAY_PORT_CLK SIM_SCGC5_PORTE_MASK
+/* Motor Mixing Relay */
+#define MOTOR_RELAY_PIN        31U          // PTE31 - Relé para motor de mezclado
+#define MOTOR_RELAY_PORT       PORTE
+#define MOTOR_RELAY_GPIO       GPIOE
 
-#define MOTOR_RELAY_PIN 31          // PTE31 - Relé para motor de mezclado
-#define MOTOR_RELAY_PORT_CLK SIM_SCGC5_PORTE_MASK
-
-/* 1 Dispenser Relay */
-#define DISPENSER_RELAY_PIN 23      // PTE23 - Relé para dispensador
-#define DISPENSER_RELAY_PORT_CLK SIM_SCGC5_PORTE_MASK
+/* Dispenser Relay - CORREGIDO */
+#define DISPENSER_RELAY_PIN    23U          // PTE23 - Relé para dispensador
 #define DISPENSER_RELAY_PORT   PORTE
 #define DISPENSER_RELAY_GPIO   GPIOE
 
+/* Port clock enables */
+#define PUMP_RELAY_PORT_CLK       SIM_SCGC5_PORTE_MASK
+#define MOTOR_RELAY_PORT_CLK      SIM_SCGC5_PORTE_MASK
+#define DISPENSER_RELAY_PORT_CLK  SIM_SCGC5_PORTE_MASK
+
 /*******************************************************************************
- * Water Level Sensors (Digital/Analog Inputs) - REDUCED TO 3 SENSORS
+ * Water Level Sensors (Digital Inputs) - REDUCED TO 3 SENSORS
  ******************************************************************************/
 #define SENSOR_1_PORT       PORTC
 #define SENSOR_1_GPIO       GPIOC
@@ -77,23 +80,6 @@
 #define SENSOR_3_PORT       PORTC
 #define SENSOR_3_GPIO       GPIOC
 #define SENSOR_3_PIN        3U
-
-/* SENSOR_4 REMOVED - Pin PORTC4 now available for other uses */
-
-/*******************************************************************************
- * H-Bridge Motor Control
- ******************************************************************************/
-#define MIXING_IN1_PORT     PORTE
-#define MIXING_IN1_GPIO     GPIOE
-#define MIXING_IN1_PIN      23U
-
-#define MIXING_IN2_PORT     PORTE
-#define MIXING_IN2_GPIO     GPIOE
-#define MIXING_IN2_PIN      29U
-
-#define MIXING_ENA_PORT     PORTE
-#define MIXING_ENA_GPIO     GPIOE
-#define MIXING_ENA_PIN      30U
 
 /*******************************************************************************
  * 4x4 Matrix Keypad
@@ -134,10 +120,8 @@
 
 /*******************************************************************************
  * 16x2 LCD Display (I2C Interface)
- * CAMBIADO: De PORTE 24/25 a PORTC 10/11
  ******************************************************************************/
-/* I2C pins para LCD - Reasignados a PORTC 10/11 */
-/* SDA - PORTC11 AND SLC - PORTC10*/ 
+/* I2C pins para LCD - PORTC 10/11 */
 #define LCD_I2C_SDA_PORT    PORTC
 #define LCD_I2C_SDA_GPIO    GPIOC
 #define LCD_I2C_SDA_PIN     11U
@@ -149,7 +133,7 @@
 /*******************************************************************************
  * Additional Sensors (Optional)
  ******************************************************************************/
-/* Emergency stop button - Solo dejamos el botón de emergencia */
+/* Emergency stop button */
 #define EMERGENCY_STOP_PORT     PORTC
 #define EMERGENCY_STOP_GPIO     GPIOC
 #define EMERGENCY_STOP_PIN      12U
@@ -178,13 +162,13 @@ typedef struct {
  * Pin Arrays for Easy Initialization
  ******************************************************************************/
 extern const gpio_input_config_t sensor_pins[WATER_LEVEL_SENSORS_COUNT];
-extern const gpio_pin_config_extended_t motor_control_pins[];
 extern const gpio_pin_config_extended_t keypad_row_pins[KEYPAD_ROWS];
 extern const gpio_input_config_t keypad_col_pins[KEYPAD_COLS];
 extern const gpio_pin_config_extended_t status_led_pins[3];
 
 extern const gpio_pin_config_extended_t pump_relay_pins[PUMP_RELAY_COUNT];
 extern const gpio_pin_config_extended_t dispenser_relay_pins[DISPENSER_RELAY_COUNT];
+
 /*******************************************************************************
  * Function Prototypes
  ******************************************************************************/
@@ -193,7 +177,6 @@ void gpio_config_init_leds(void);
 void gpio_config_init_pump_relays(void);
 void gpio_config_init_dispenser_relay(void);
 void gpio_config_init_sensors(void);
-void gpio_config_init_motors(void);
 void gpio_config_init_keypad(void);
 void gpio_config_init_lcd_i2c(void);
 void gpio_config_init_emergency_stop(void);
@@ -209,11 +192,6 @@ void gpio_led_set_rgb(bool red, bool green, bool blue);
 /* Sensor reading functions */
 bool gpio_sensor_read(uint8_t sensor_index);
 uint8_t gpio_sensors_read_all(void);
-
-/* Motor control functions - Solo motor de mezcla */
-void gpio_motor_set_direction(bool forward);
-void gpio_motor_stop(void);
-void gpio_motor_set_enable(bool enable);
 
 /* Keypad functions */
 uint8_t gpio_keypad_scan(void);
@@ -239,6 +217,5 @@ void gpio_pin_toggle(GPIO_Type *gpio, uint32_t pin);
 #define WATER_SENSOR_1_INDEX    0
 #define WATER_SENSOR_2_INDEX    1
 #define WATER_SENSOR_3_INDEX    2
-/* WATER_SENSOR_4_INDEX removed */
 
 #endif /* GPIO_CONFIG_H */

@@ -207,6 +207,11 @@ int main(void) {
     
     // Bucle principal
     while (1) {
+//        StartupFlow_Run();
+//        BeverageSelectFlow_Run();
+//        BeverageSelectFlow_Restart();
+//        MixingServingFlow_Run();
+//        MixingServingFlow_Restart();
         SystemController_Run();
         Delay(100); // Pequeño delay para estabilidad
     }

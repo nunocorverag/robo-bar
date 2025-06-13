@@ -61,14 +61,6 @@ void BOARD_InitGPIO(void)
 
     gpio_config.pinDirection = kGPIO_DigitalOutput;
 
-    PORT_SetPinMux(MIXING_IN1_PORT, MIXING_IN1_PIN, kPORT_MuxAsGpio);
-    PORT_SetPinMux(MIXING_IN2_PORT, MIXING_IN2_PIN, kPORT_MuxAsGpio);
-    PORT_SetPinMux(MIXING_ENA_PORT, MIXING_ENA_PIN, kPORT_MuxAsGpio);
-
-    GPIO_PinInit(MIXING_IN1_GPIO, MIXING_IN1_PIN, &gpio_config);
-    GPIO_PinInit(MIXING_IN2_GPIO, MIXING_IN2_PIN, &gpio_config);
-    GPIO_PinInit(MIXING_ENA_GPIO, MIXING_ENA_PIN, &gpio_config);
-
     PORT_SetPinMux(KEYPAD_ROW1_PORT, KEYPAD_ROW1_PIN, kPORT_MuxAsGpio);
     PORT_SetPinMux(KEYPAD_ROW2_PORT, KEYPAD_ROW2_PIN, kPORT_MuxAsGpio);
     PORT_SetPinMux(KEYPAD_ROW3_PORT, KEYPAD_ROW3_PIN, kPORT_MuxAsGpio);

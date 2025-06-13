@@ -3,9 +3,12 @@
  *
  * System-wide configuration definitions for Robo-Bar project
  * FRDM-KL25Z Development Board
+ * LIMPIADO: Referencias a H-Bridge removidas
  */
+
 #ifndef SYSTEM_CONFIG_H
 #define SYSTEM_CONFIG_H
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -29,7 +32,7 @@
 /*******************************************************************************
  * System Components Configuration
  ******************************************************************************/
-/* Liquid Dispensing System */
+/* Liquid Systems */
 #define WATER_LEVEL_SENSORS_COUNT   3U           /* Number of level sensors - REDUCED TO 3 */
 #define MAX_DISPENSE_TIME_MS        5000U        /* Maximum dispense time */
 
@@ -37,20 +40,24 @@
 #define KEYPAD_ROWS                 4U           /* 4x4 matrix keypad */
 #define KEYPAD_COLS                 4U
 
-/* Motor Control */
-#define MIXING_MOTOR_COUNT          1U
-
-/* Liquid Dispensing System - Relay-based */
+/* Relay Control System */
 #define PUMP_RELAY_COUNT           3U           /* Number of ingredient pump relays */
 #define DISPENSER_RELAY_COUNT      1U           /* Number of dispenser relays */
-#define TOTAL_RELAY_COUNT          4U           /* Total relays (3 pumps + 1 dispenser) */
+#define MOTOR_RELAY_COUNT          1U           /* Number of motor relays (mixing) */
+#define TOTAL_RELAY_COUNT          5U           /* Total relays (3 pumps + 1 dispenser + 1 motor) */
 #define MAX_PUMP_TIME_MS           5000U        /* Maximum pump activation time */
-#define WATER_LEVEL_SENSORS_COUNT  3U           /* Number of level sensors */
 
 /*******************************************************************************
  * Debug and Monitoring Configuration
  ******************************************************************************/
 #define DEBUG_UART_BAUDRATE         115200U      /* Debug UART baud rate */
 #define DEBUG_BUFFER_SIZE           256U         /* Debug message buffer size */
+
+/*******************************************************************************
+ * Flow Control Configuration
+ ******************************************************************************/
+#define DEFAULT_MIXING_TIME_MS      5000U        /* Default mixing time */
+#define DEFAULT_SERVING_TIME_MS     5000U        /* Default serving time */
+#define DEFAULT_PAUSE_TIME_MS       1000U        /* Default pause time */
 
 #endif /* SYSTEM_CONFIG_H */
